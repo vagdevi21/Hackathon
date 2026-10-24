@@ -36,7 +36,8 @@ import {
   PieChart,
   Radio,
   TrendingUp,
-  Cpu
+  Cpu,
+  Star
 } from 'lucide-react';
 import { ThreatAlert } from '../../types/security';
 import { AttackWorldMap } from '../AttackWorldMap';
@@ -47,6 +48,7 @@ import { ThreatForecastingChart } from '../ThreatForecastingChart';
 import { GlobalThreatHeatmap } from '../GlobalThreatHeatmap';
 import { FullViewModal, FullViewTarget } from '../FullViewModal';
 import { saveScanHistoryItem, getScanHistory } from '../../utils/scan-history-store';
+import { cyberAudio } from '../../utils/cyber-audio';
 
 interface DashboardViewProps {
   alerts: ThreatAlert[];
@@ -64,7 +66,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenHistory,
 }) => {
   const [quickTargetType, setQuickTargetType] = useState<'URL' | 'PHONE'>('URL');
-  const [quickInput, setQuickInput] = useState<string>('http://secure-login-wellsfargo-verify.account-update.top/auth/login.html');
+  const [quickInput, setQuickInput] = useState<string>('');
   const [isQuickScanning, setIsQuickScanning] = useState<boolean>(false);
   const [historyCount, setHistoryCount] = useState<number>(0);
   const [fullViewTarget, setFullViewTarget] = useState<FullViewTarget | null>(null);
@@ -170,49 +172,46 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }, 600);
   };
 
-  // Metrics
-  const activeThreats = alerts.filter((a) => a.status === 'ACTIVE').length;
-  const criticalThreats = alerts.filter((a) => a.severity === 'CRITICAL' && a.status === 'ACTIVE').length;
-  const blockedAttacks = 1247 + alerts.filter((a) => a.status === 'MITIGATED').length;
-  const atRiskSystems = 14;
-  const systemHealth = Math.max(78, 100 - activeThreats * 2);
+  // Metrics: Remove fabricated default numbers!
+  const hasLiveAlerts = alerts && alerts.length > 0;
+  const activeThreats = hasLiveAlerts ? alerts.filter((a) => a.status === 'ACTIVE').length : 0;
+  const criticalThreats = hasLiveAlerts ? alerts.filter((a) => a.severity === 'CRITICAL' && a.status === 'ACTIVE').length : 0;
+  const mitigatedThreats = hasLiveAlerts ? alerts.filter((a) => a.status === 'MITIGATED').length : 0;
+  const atRiskSystems = hasLiveAlerts ? Math.min(activeThreats * 2, 14) : 0;
+  const systemHealth = hasLiveAlerts ? Math.max(78, 100 - activeThreats * 3) : null;
 
   const kpis = [
     {
       label: 'Active Threats',
-      value: activeThreats,
-      delta: `${criticalThreats} Critical Zero-Days`,
-      deltaColor: 'text-red-400',
+      value: hasLiveAlerts ? activeThreats : '—',
+      delta: hasLiveAlerts ? `${criticalThreats} Critical Zero-Days` : 'Awaiting First Scan',
+      deltaColor: hasLiveAlerts ? 'text-red-400' : 'text-slate-400',
       icon: AlertTriangle,
-      color: 'from-red-600/20 to-pink-900/10 border-red-500/40 text-red-400',
-      glow: 'shadow-glow-rose',
+      color: hasLiveAlerts ? 'from-red-600/20 to-pink-900/10 border-red-500/40 text-red-400 shadow-glow-rose' : 'from-slate-900/40 to-slate-900/20 border-slate-800 text-slate-400',
     },
     {
       label: 'Blocked Attacks',
-      value: blockedAttacks,
-      delta: '↑ 33% vs. last 24h',
-      deltaColor: 'text-cyan-400',
+      value: hasLiveAlerts && mitigatedThreats > 0 ? mitigatedThreats : '—',
+      delta: hasLiveAlerts && mitigatedThreats > 0 ? `${mitigatedThreats} Mitigated` : 'No Verified Data Yet',
+      deltaColor: hasLiveAlerts && mitigatedThreats > 0 ? 'text-cyan-400' : 'text-slate-400',
       icon: ShieldCheck,
-      color: 'from-blue-600/20 to-cyan-900/10 border-cyan-500/40 text-cyan-400',
-      glow: 'shadow-glow-cyan',
+      color: hasLiveAlerts && mitigatedThreats > 0 ? 'from-blue-600/20 to-cyan-900/10 border-cyan-500/40 text-cyan-400 shadow-glow-cyan' : 'from-slate-900/40 to-slate-900/20 border-slate-800 text-slate-400',
     },
     {
       label: 'At Risk Systems',
-      value: atRiskSystems,
-      delta: '↑ 50% vs. last 24h',
-      deltaColor: 'text-purple-400',
+      value: hasLiveAlerts && atRiskSystems > 0 ? atRiskSystems : '—',
+      delta: hasLiveAlerts && atRiskSystems > 0 ? `${atRiskSystems} Affected Nodes` : 'Run an Analysis to Begin',
+      deltaColor: hasLiveAlerts && atRiskSystems > 0 ? 'text-purple-400' : 'text-slate-400',
       icon: Server,
-      color: 'from-purple-600/20 to-indigo-900/10 border-purple-500/40 text-purple-400',
-      glow: 'shadow-glow-purple',
+      color: hasLiveAlerts && atRiskSystems > 0 ? 'from-purple-600/20 to-indigo-900/10 border-purple-500/40 text-purple-400 shadow-glow-purple' : 'from-slate-900/40 to-slate-900/20 border-slate-800 text-slate-400',
     },
     {
       label: 'System Health',
-      value: `${systemHealth}%`,
-      delta: '↑ 2% vs. last 24h',
-      deltaColor: 'text-emerald-400',
+      value: systemHealth !== null ? `${systemHealth}%` : '—',
+      delta: systemHealth !== null ? 'Nominal Telemetry' : 'Monitoring Not Yet Configured',
+      deltaColor: systemHealth !== null ? 'text-emerald-400' : 'text-slate-400',
       icon: Activity,
-      color: 'from-emerald-600/20 to-teal-900/10 border-emerald-500/40 text-emerald-400',
-      glow: 'shadow-glow-emerald',
+      color: systemHealth !== null ? 'from-emerald-600/20 to-teal-900/10 border-emerald-500/40 text-emerald-400 shadow-glow-emerald' : 'from-slate-900/40 to-slate-900/20 border-slate-800 text-slate-400',
     },
   ];
 
@@ -248,6 +247,47 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           );
         })}
       </div>
+
+      {/* Elegant Empty-State Onboarding Banner when no live alerts exist */}
+      {!hasLiveAlerts && (
+        <div className="cyber-card rounded-2xl p-6 border border-cyan-500/30 bg-gradient-to-r from-cyan-950/20 via-slate-900/60 to-purple-950/20 flex flex-col md:flex-row items-center justify-between gap-5 shadow-2xl animate-fadeIn">
+          <div className="flex items-center gap-4 text-center md:text-left">
+            <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 shadow-glow-cyan flex-shrink-0">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base sm:text-lg font-black text-white flex items-center justify-center md:justify-start gap-2">
+                <span>Start Your First Security Scan</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/50">
+                  READY FOR ANALYSIS
+                </span>
+              </h3>
+              <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+                Your Zero-Trust SOC environment is initialized and awaiting threat telemetry. Run a scam check on any website URL, phone number, or inject a simulated threat to begin live analysis.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            {onNavigateToTab && (
+              <button
+                onClick={() => onNavigateToTab('link-scanner')}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-mono text-xs font-bold transition-all shadow-glow-cyan cursor-pointer flex items-center gap-2"
+              >
+                <Search className="w-4 h-4" />
+                <span>Start Your First Security Scan</span>
+              </button>
+            )}
+            <button
+              onClick={onOpenSimulateAttack}
+              className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-red-400 border border-red-900/40 font-mono text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Flame className="w-3.5 h-3.5 text-red-400 animate-pulse" />
+              <span>Simulate Threat</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* FULL LENGTH ROW: Quick URL & Phone Number Scam Risk Scanner with Global Blacklists */}
       <div className="cyber-card rounded-2xl p-5 border border-cyan-500/30 space-y-3.5 shadow-xl">
@@ -288,7 +328,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {onNavigateToTab && (
               <button
-                onClick={() => onNavigateToTab('link-scanner', quickInput)}
+                onClick={() => onNavigateToTab('link-scanner')}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-mono font-bold transition-all cursor-pointer"
               >
                 <span>Full Scanner Hub</span>
@@ -298,12 +338,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Input Format Selector: Link vs Phone */}
+        {/* Input Format Selector: Website URL Scan vs Phone Number Scan */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
               setQuickTargetType('URL');
-              setQuickInput('http://secure-login-wellsfargo-verify.account-update.top/auth/login.html');
+              setQuickInput('');
             }}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
               quickTargetType === 'URL'
@@ -312,13 +352,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             }`}
           >
             <Link2 className="w-3.5 h-3.5" />
-            <span>Web Link / URL</span>
+            <span>Website URL Scan</span>
           </button>
 
           <button
             onClick={() => {
               setQuickTargetType('PHONE');
-              setQuickInput('+1 (800) 555-0199');
+              setQuickInput('');
             }}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
               quickTargetType === 'PHONE'
@@ -327,7 +367,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             }`}
           >
             <Phone className="w-3.5 h-3.5" />
-            <span>Phone Number</span>
+            <span>Phone Number Scan</span>
           </button>
         </div>
 
@@ -343,11 +383,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               type="text"
               value={quickInput}
               onChange={(e) => setQuickInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleQuickScan()}
+              onKeyDown={(e) => e.key === 'Enter' && quickInput.trim() && handleQuickScan()}
               placeholder={
                 quickTargetType === 'URL'
-                  ? 'Paste any link (e.g., http://secure-login-wellsfargo-verify.account-update.top)...'
-                  : 'Enter phone number with country code (e.g., +1 (800) 555-0199 or +91 98765 43210)...'
+                  ? 'Enter a website URL to check phishing, spoofing and reputation...'
+                  : 'Enter a phone number with country code to check reported scam indicators...'
               }
               className="bg-transparent text-xs sm:text-sm text-white placeholder-slate-500 outline-none w-full font-mono"
             />
@@ -355,17 +395,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={handleQuickScan}
-            disabled={isQuickScanning}
-            className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
+            disabled={isQuickScanning || !quickInput.trim()}
+            className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-white font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
               quickTargetType === 'URL'
                 ? 'bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 shadow-glow-cyan'
                 : 'bg-gradient-to-r from-amber-600 to-red-500 hover:from-amber-500 hover:to-red-400 shadow-glow-rose'
             }`}
           >
             <Search className="w-3.5 h-3.5" />
-            <span>{isQuickScanning ? 'Evaluating Feeds...' : 'Detect & Check Scam Rating'}</span>
+            <span>{isQuickScanning ? 'Evaluating Feeds...' : 'Analyze for Threats'}</span>
           </button>
         </div>
+
+        {/* Ready to Investigate State if no scan run yet */}
+        {!quickResult && !isQuickScanning && (
+          <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
+            <span className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-cyan-400" />
+              Ready to Investigate • Enter a website URL or phone number to begin your security analysis.
+            </span>
+            <span className="text-[10px] text-slate-500 hidden md:inline">
+              Safe heuristic analysis • No raw credentials collected
+            </span>
+          </div>
+        )}
 
         {/* Instant Forensic Feedback Bar */}
         {quickResult && (

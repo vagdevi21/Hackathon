@@ -33,7 +33,7 @@ import {
   HelpCircle,
   Smartphone
 } from 'lucide-react';
-import { AuthMethod, UserProfile, saveUser, getStoredUser } from '../utils/auth-store';
+import { AuthMethod, UserProfile, saveUser, getStoredUser, loginUser } from '../utils/auth-store';
 import { UserRole } from '../utils/security-engine';
 import { cyberAudio } from '../utils/cyber-audio';
 
@@ -243,17 +243,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       setIsIrisVerified(true);
     }
 
-    const newUser: UserProfile = {
-      username: username.trim(),
-      displayName: username.split(' ')[0] || username,
-      role: role,
-      authMethod: selectedMethod,
-      aadhaarNumber: aadhaarInput,
-      isVerified: true,
-      lastLogin: new Date().toISOString(),
-    };
-
-    saveUser(newUser);
+    const newUser = loginUser(username.trim(), selectedMethod, role);
     cyberAudio.playSuccess();
     onLoginSuccess(newUser);
     stopCamera();

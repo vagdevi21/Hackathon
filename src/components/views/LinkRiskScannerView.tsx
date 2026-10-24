@@ -32,7 +32,8 @@ import {
   Flag,
   Database,
   Smartphone,
-  Info
+  Info,
+  Shield
 } from 'lucide-react';
 import { saveScanHistoryItem, getScanHistory, ScanHistoryRecord } from '../../utils/scan-history-store';
 
@@ -71,9 +72,7 @@ export const LinkRiskScannerView: React.FC<LinkRiskScannerViewProps> = ({
   initialQuery
 }) => {
   const [activeTab, setActiveTab] = useState<'URL' | 'PHONE'>('URL');
-  const [inputQuery, setInputQuery] = useState<string>(
-    initialQuery || 'http://secure-login-wellsfargo-verify.account-update.top/auth/login.html'
-  );
+  const [inputQuery, setInputQuery] = useState<string>(initialQuery || '');
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [report, setReport] = useState<UniversalScanReport | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
@@ -89,18 +88,14 @@ export const LinkRiskScannerView: React.FC<LinkRiskScannerViewProps> = ({
   }, []);
 
   useEffect(() => {
-    if (initialQuery) {
+    if (initialQuery && initialQuery.trim()) {
       setInputQuery(initialQuery);
-      // Auto-detect phone vs url
       if (initialQuery.startsWith('+') || /^\d[\d\s\-\(\)]{6,}$/.test(initialQuery.trim())) {
         setActiveTab('PHONE');
       } else {
         setActiveTab('URL');
       }
       handleExecuteScan(initialQuery);
-    } else if (!report) {
-      // Run default initial report
-      handleExecuteScan(inputQuery);
     }
   }, [initialQuery]);
 
@@ -600,12 +595,12 @@ ${report.recommendedMitigations.map(m => '• ' + m).join('\n')}`;
           )}
         </div>
 
-        {/* Tab Selection: URL vs Phone */}
+        {/* Tab Selection: Website URL Scan vs Phone Number Scan */}
         <div className="flex items-center gap-2 mt-5 border-b border-slate-800/80 pb-3">
           <button
             onClick={() => {
               setActiveTab('URL');
-              setInputQuery(urlPresets[0].query);
+              setInputQuery('');
             }}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'URL'
@@ -614,13 +609,13 @@ ${report.recommendedMitigations.map(m => '• ' + m).join('\n')}`;
             }`}
           >
             <Link2 className="w-4 h-4" />
-            <span>Web Link & URL Scanner</span>
+            <span>Website URL Scan</span>
           </button>
 
           <button
             onClick={() => {
               setActiveTab('PHONE');
-              setInputQuery(phonePresets[0].query);
+              setInputQuery('');
             }}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'PHONE'
@@ -629,7 +624,7 @@ ${report.recommendedMitigations.map(m => '• ' + m).join('\n')}`;
             }`}
           >
             <Phone className="w-4 h-4" />
-            <span>Phone Number Scam Detector</span>
+            <span>Phone Number Scan</span>
           </button>
         </div>
 
@@ -645,11 +640,11 @@ ${report.recommendedMitigations.map(m => '• ' + m).join('\n')}`;
               type="text"
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleExecuteScan()}
+              onKeyDown={(e) => e.key === 'Enter' && inputQuery.trim() && handleExecuteScan()}
               placeholder={
                 activeTab === 'URL'
-                  ? 'Paste any website URL or link (e.g. http://wellsfargo-verify.top)...'
-                  : 'Enter phone number with country code (e.g. +1 (800) 555-0199 or +91 98765 43210)...'
+                  ? 'Enter a website URL to check phishing, spoofing and reputation...'
+                  : 'Enter a phone number with country code to check reported scam indicators...'
               }
               className="bg-transparent text-xs sm:text-sm text-white placeholder-slate-500 outline-none w-full font-mono"
             />
@@ -657,21 +652,21 @@ ${report.recommendedMitigations.map(m => '• ' + m).join('\n')}`;
 
           <button
             onClick={() => handleExecuteScan()}
-            disabled={isScanning}
-            className={`w-full sm:w-auto px-6 py-3 rounded-xl font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-white ${
+            disabled={isScanning || !inputQuery.trim()}
+            className={`w-full sm:w-auto px-6 py-3 rounded-xl font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed text-white ${
               activeTab === 'URL'
                 ? 'bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 shadow-glow-purple'
                 : 'bg-gradient-to-r from-amber-600 to-red-500 hover:from-amber-500 hover:to-red-400 shadow-glow-rose'
             }`}
           >
             <Search className="w-4 h-4" />
-            <span>{isScanning ? 'Running Forensics...' : `Detect & Analyze ${activeTab}`}</span>
+            <span>{isScanning ? 'Running Forensics...' : 'Analyze for Threats'}</span>
           </button>
         </div>
 
-        {/* Demo Presets Row */}
+        {/* Quick Test Presets Row (Optional user testing chips) */}
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-[11px] font-mono text-slate-400">Quick Test Cases:</span>
+          <span className="text-[11px] font-mono text-slate-400">Optional Test Presets:</span>
           {(activeTab === 'URL' ? urlPresets : phonePresets).map((p, idx) => (
             <button
               key={idx}
@@ -686,6 +681,31 @@ ${report.recommendedMitigations.map(m => '• ' + m).join('\n')}`;
           ))}
         </div>
       </div>
+
+      {/* Clean Empty State when no scan report has been generated yet */}
+      {!report && !isScanning && (
+        <div className="cyber-card rounded-2xl p-10 border border-slate-800/80 text-center space-y-4 max-w-2xl mx-auto my-6 animate-fadeIn">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-600/20 border border-cyan-500/40 mx-auto flex items-center justify-center text-cyan-400 shadow-glow-cyan">
+            <ShieldCheck className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-1.5">
+            <h3 className="text-xl font-black text-white tracking-tight">
+              Ready to Investigate
+            </h3>
+            <p className="text-sm text-slate-400 max-w-md mx-auto">
+              Enter a website URL or phone number to begin your security analysis.
+            </p>
+          </div>
+
+          <div className="pt-2 text-[11px] font-mono text-slate-500 max-w-lg mx-auto flex items-center justify-center gap-2">
+            <Shield className="w-3.5 h-3.5 text-cyan-500 flex-shrink-0" />
+            <span>
+              Client-side safe inspection. URL and phone queries are parsed locally and evaluated against reputation heuristics. No raw credentials collected.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Report Display */}
       {report && (
