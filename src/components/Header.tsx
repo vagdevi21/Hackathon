@@ -151,9 +151,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-base font-black tracking-tight text-white leading-none">
               Dark<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">Watch</span>
             </span>
-            <span className="ml-1 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/50">
-              AI
-            </span>
           </div>
         </div>
       </div>

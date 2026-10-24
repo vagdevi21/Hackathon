@@ -107,9 +107,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
             Welcome to DarkWatch AI
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Analyze suspicious URLs, investigate phone scam indicators, and review security findings.
-          </p>
         </div>
       </div>
 
@@ -186,10 +183,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </button>
               )}
             </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              {latestAnalysis.recommendationMessage}
-            </p>
           </div>
         )}
       </div>

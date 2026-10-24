@@ -404,9 +404,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <p className="text-lg sm:text-xl font-medium text-cyan-300/90 tracking-wide font-mono">
                 "Detect Early. Defend Smarter. Stay Secure."
               </p>
-              <p className="text-sm text-slate-400 max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
-                Autonomous AI telemetry surveillance, predictive attack surge forecasting, URL phishing inspection, and human-in-the-loop incident mitigation for enterprise SecOps.
-              </p>
             </div>
           </div>
 
@@ -417,20 +414,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-500" />
 
               <div className="space-y-6">
-                {/* Header within Card */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                      <span>Zero-Trust Authentication</span>
-                    </h2>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950/90 text-cyan-300 border border-cyan-500/40">
-                      SECURE GATEWAY
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Select your authorized authentication method to access the DarkWatch SOC.
-                  </p>
-                </div>
 
                 {/* Mode Switcher Tabs: Login vs Register Account */}
                 <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-950/90 border border-slate-800 text-xs font-semibold">
@@ -500,41 +483,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       </div>
                     </div>
 
-                    {/* 2. Authentication Method Dropdown Selector */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                        <span className="flex items-center gap-1.5">
-                          <KeyRound className="w-3.5 h-3.5 text-purple-400" />
-                          Authentication Method:
-                        </span>
-                        <span className="text-[10px] text-cyan-400 font-mono font-bold">3 SECURE MODES</span>
-                      </label>
-
-                      <div className="relative">
-                        <select
-                          value={authMethod}
-                          onChange={(e) => {
-                            setAuthMethod(e.target.value as AuthMethod);
-                            setErrorMsg(null);
-                            setSuccessMsg(null);
-                          }}
-                          className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-slate-800 focus:border-cyan-400 text-white font-mono text-xs sm:text-sm appearance-none outline-none cursor-pointer pr-10 transition-colors"
-                        >
-                          <option value="PASSWORD_BIOMETRIC">
-                            1. Password / Biometric Authentication
-                          </option>
-                          <option value="MOBILE_OTP">
-                            2. Mobile OTP Authentication
-                          </option>
-                          <option value="FACE_AUTH">
-                            3. Face Authentication
-                          </option>
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      </div>
-                    </div>
-
-                    {/* 3. DYNAMIC FORM FIELDS BASED ON SELECTED METHOD */}
+                    {/* DYNAMIC FORM FIELDS BASED ON SELECTED METHOD */}
                     <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 transition-all">
                       
                       {/* Method 1: Password / Biometric */}
@@ -817,6 +766,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                           )}
                         </div>
                       )}
+                    </div>
+
+                    {/* Authentication Method Dropdown Selector (Moved Below Account Password / Dynamic Method Section) */}
+                    <div className="space-y-1.5 pt-1">
+                      <label className="text-xs font-semibold text-slate-300 flex items-center justify-between font-mono">
+                        <span className="flex items-center gap-1.5">
+                          <KeyRound className="w-3.5 h-3.5 text-purple-400" />
+                          Authentication Method:
+                        </span>
+                        <span className="text-[10px] text-cyan-400 font-bold">3 SECURE MODES</span>
+                      </label>
+
+                      <div className="relative">
+                        <select
+                          value={authMethod}
+                          onChange={(e) => {
+                            setAuthMethod(e.target.value as AuthMethod);
+                            setErrorMsg(null);
+                            setSuccessMsg(null);
+                          }}
+                          className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-slate-800 focus:border-cyan-400 text-white font-mono text-xs sm:text-sm appearance-none outline-none cursor-pointer pr-10 transition-colors shadow-inner"
+                        >
+                          <option value="PASSWORD_BIOMETRIC">1. Password / Biometric Authentication</option>
+                          <option value="MOBILE_OTP">2. Mobile OTP Authentication</option>
+                          <option value="FACE_AUTH">3. Face Authentication</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
                     </div>
 
                     {/* Feedback Banners */}
