@@ -27,6 +27,7 @@ export interface ScanHistoryRecord {
   country?: string;
   isSaved?: boolean;
   notes?: string;
+  username?: string;
 }
 
 const STORAGE_KEY = 'darkwatch_scan_history_v1';
@@ -117,25 +118,38 @@ const INITIAL_SEEDED_HISTORY: ScanHistoryRecord[] = [
   },
 ];
 
-export const getScanHistory = (): ScanHistoryRecord[] => {
+export const getScanHistory = (username?: string): ScanHistoryRecord[] => {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       return [];
     }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: ScanHistoryRecord[] = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    if (!username) {
+      return parsed;
+    }
+
+    const cleanUser = username.toLowerCase().trim();
+    // Return items tagged with this username OR general seeded items with no username attached
+    return parsed.filter(
+      (item) => !item.username || item.username.toLowerCase().trim() === cleanUser
+    );
   } catch {
     return [];
   }
 };
 
-export const seedSampleScans = (): ScanHistoryRecord[] => {
+export const seedSampleScans = (username?: string): ScanHistoryRecord[] => {
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_SEEDED_HISTORY));
-      window.dispatchEvent(new CustomEvent('darkwatch_history_updated', { detail: INITIAL_SEEDED_HISTORY }));
+      const seeded = INITIAL_SEEDED_HISTORY.map((item) => ({ ...item, username }));
+      const existing = getScanHistory();
+      const merged = [...seeded, ...existing.filter((e) => !INITIAL_SEEDED_HISTORY.some((s) => s.id === e.id))];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent('darkwatch_history_updated', { detail: merged }));
     } catch (e) {
       console.error(e);
     }
@@ -144,20 +158,31 @@ export const seedSampleScans = (): ScanHistoryRecord[] => {
 };
 
 export const saveScanHistoryItem = (
-  item: Omit<ScanHistoryRecord, 'id' | 'timestamp' | 'isoDate'>
+  item: Omit<ScanHistoryRecord, 'id' | 'timestamp' | 'isoDate'>,
+  username?: string
 ): ScanHistoryRecord => {
-  const current = getScanHistory();
+  const currentRaw = localStorage.getItem(STORAGE_KEY);
+  let allRecords: ScanHistoryRecord[] = [];
+  try {
+    allRecords = currentRaw ? JSON.parse(currentRaw) : [];
+    if (!Array.isArray(allRecords)) allRecords = [];
+  } catch {
+    allRecords = [];
+  }
+
   const now = new Date();
+  const recordUser = username || item.username;
   const newRecord: ScanHistoryRecord = {
     ...item,
     id: `HIST-${Math.floor(1000 + Math.random() * 9000)}`,
     timestamp: `Just now (${now.toISOString().substring(11, 16)} UTC)`,
     isoDate: now.toISOString(),
     isSaved: item.isSaved ?? true, // Auto-save by default to meet user requirement
+    username: recordUser,
   };
 
-  // Prepend new item and limit history size to 60
-  const updated = [newRecord, ...current.filter((x) => x.query !== item.query)].slice(0, 60);
+  // Prepend new item and limit total history size to 100
+  const updated = [newRecord, ...allRecords.filter((x) => x.query !== item.query)].slice(0, 100);
 
   if (typeof window !== 'undefined') {
     try {
@@ -226,11 +251,21 @@ export const deleteScanHistoryItem = (id: string): void => {
   }
 };
 
-export const clearAllScanHistory = (): void => {
+export const clearAllScanHistory = (username?: string): void => {
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-      window.dispatchEvent(new CustomEvent('darkwatch_history_updated', { detail: [] }));
+      if (!username) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+        window.dispatchEvent(new CustomEvent('darkwatch_history_updated', { detail: [] }));
+      } else {
+        const cleanUser = username.toLowerCase().trim();
+        const current = getScanHistory();
+        const remaining = current.filter(
+          (item) => item.username && item.username.toLowerCase().trim() !== cleanUser
+        );
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+        window.dispatchEvent(new CustomEvent('darkwatch_history_updated', { detail: remaining }));
+      }
     } catch (e) {
       console.error(e);
     }

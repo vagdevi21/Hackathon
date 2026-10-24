@@ -285,7 +285,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-black text-white tracking-tight">
+                <h2 className="text-xl font-serif font-darkwatch font-bold text-white tracking-tight" style={{ fontFamily: "'Times New Roman', Times, serif" }}>
                   Dark<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">Watch</span> AI
                 </h2>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/50">

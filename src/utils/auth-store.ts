@@ -225,6 +225,9 @@ export const getAuthMethodLabel = (method: AuthMethod): string => {
 
 const PASSWORDS_KEY = 'darkwatch_user_passwords_v1';
 const REGISTERED_ACCOUNTS_KEY = 'darkwatch_registered_accounts_v2';
+const FAILED_ATTEMPTS_KEY = 'darkwatch_failed_attempts_v1';
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const DEFAULT_PASSWORD = 'darkwatch123';
 
 export interface RegisteredAccount {
@@ -235,6 +238,94 @@ export interface RegisteredAccount {
   accountIdentifier: string;
   registeredAt: string;
 }
+
+export interface FailedLoginRecord {
+  attempts: number;
+  lockoutUntil: number | null;
+}
+
+export const getLockoutRecord = (identifier: string): FailedLoginRecord => {
+  if (typeof window === 'undefined') return { attempts: 0, lockoutUntil: null };
+  try {
+    const raw = localStorage.getItem(FAILED_ATTEMPTS_KEY);
+    if (!raw) return { attempts: 0, lockoutUntil: null };
+    const store: Record<string, FailedLoginRecord> = JSON.parse(raw);
+    const key = identifier.toLowerCase().trim();
+    return store[key] || { attempts: 0, lockoutUntil: null };
+  } catch {
+    return { attempts: 0, lockoutUntil: null };
+  }
+};
+
+export const checkAccountLockout = (
+  identifier: string
+): { isLocked: boolean; remainingHours: number; remainingMinutes: number; attemptsLeft: number } => {
+  const record = getLockoutRecord(identifier);
+  if (record.lockoutUntil) {
+    const now = Date.now();
+    if (now < record.lockoutUntil) {
+      const diffMs = record.lockoutUntil - now;
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.max(1, Math.ceil((diffMs % (1000 * 60 * 60)) / (1000 * 60)));
+      return { isLocked: true, remainingHours: hours, remainingMinutes: minutes, attemptsLeft: 0 };
+    } else {
+      // Lockout period expired - clear record
+      clearFailedAttempts(identifier);
+      return { isLocked: false, remainingHours: 0, remainingMinutes: 0, attemptsLeft: MAX_FAILED_ATTEMPTS };
+    }
+  }
+  const attemptsLeft = Math.max(0, MAX_FAILED_ATTEMPTS - record.attempts);
+  return { isLocked: false, remainingHours: 0, remainingMinutes: 0, attemptsLeft };
+};
+
+export const recordFailedAttempt = (
+  identifier: string
+): { attempts: number; isLocked: boolean; remainingHours: number; remainingMinutes: number } => {
+  if (typeof window === 'undefined') return { attempts: 1, isLocked: false, remainingHours: 0, remainingMinutes: 0 };
+  try {
+    const raw = localStorage.getItem(FAILED_ATTEMPTS_KEY);
+    const store: Record<string, FailedLoginRecord> = raw ? JSON.parse(raw) : {};
+    const key = identifier.toLowerCase().trim();
+    const current = store[key] || { attempts: 0, lockoutUntil: null };
+
+    const newAttempts = current.attempts + 1;
+    let lockoutUntil: number | null = null;
+    let isLocked = false;
+
+    if (newAttempts >= MAX_FAILED_ATTEMPTS) {
+      lockoutUntil = Date.now() + LOCKOUT_DURATION_MS;
+      isLocked = true;
+    }
+
+    const updatedRecord: FailedLoginRecord = {
+      attempts: newAttempts,
+      lockoutUntil,
+    };
+    store[key] = updatedRecord;
+    localStorage.setItem(FAILED_ATTEMPTS_KEY, JSON.stringify(store));
+
+    if (isLocked) {
+      return { attempts: newAttempts, isLocked: true, remainingHours: 24, remainingMinutes: 0 };
+    }
+    return { attempts: newAttempts, isLocked: false, remainingHours: 0, remainingMinutes: 0 };
+  } catch {
+    return { attempts: 1, isLocked: false, remainingHours: 0, remainingMinutes: 0 };
+  }
+};
+
+export const clearFailedAttempts = (identifier: string): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(FAILED_ATTEMPTS_KEY);
+    if (!raw) return;
+    const store: Record<string, FailedLoginRecord> = JSON.parse(raw);
+    const key = identifier.toLowerCase().trim();
+    delete store[key];
+    localStorage.setItem(FAILED_ATTEMPTS_KEY, JSON.stringify(store));
+  } catch (err) {
+    console.error('Failed to clear login attempts', err);
+  }
+};
 
 export const getCustomStoredPassword = (identifier: string): string | null => {
   if (typeof window === 'undefined') return null;
@@ -351,13 +442,26 @@ export const registerNewAccount = (data: {
 export const authenticateRegisteredUser = (
   usernameOrPhone: string,
   passwordInput: string,
-  authMethod: AuthMethod
+  authMethod: AuthMethod,
+  isBiometricVerified?: boolean
 ): { success: boolean; message: string; userProfile?: UserProfile } => {
   const cleanInput = usernameOrPhone.trim();
   const lowerInput = cleanInput.toLowerCase();
 
   if (!cleanInput) {
     return { success: false, message: 'Please enter your registered username or mobile number.' };
+  }
+
+  // 1. Check account lockout status for input username/phone
+  const lockoutInfo = checkAccountLockout(cleanInput);
+  if (lockoutInfo.isLocked) {
+    const timeStr = lockoutInfo.remainingHours > 0 
+      ? `${lockoutInfo.remainingHours} hours and ${lockoutInfo.remainingMinutes} minutes` 
+      : `${lockoutInfo.remainingMinutes} minutes`;
+    return {
+      success: false,
+      message: `ACCOUNT LOCKED FOR 24 HOURS due to 5 consecutive wrong password attempts. Please try again in ${timeStr} (or use "Forgot Password?" to reset).`,
+    };
   }
 
   const accounts = getRegisteredAccounts();
@@ -376,17 +480,45 @@ export const authenticateRegisteredUser = (
     };
   }
 
-  if (authMethod === 'PASSWORD_BIOMETRIC' || authMethod === 'PASSWORD') {
+  // Check lockout for matched account username
+  const accountLockoutInfo = checkAccountLockout(account.usernameOrPhone);
+  if (accountLockoutInfo.isLocked) {
+    const timeStr = accountLockoutInfo.remainingHours > 0 
+      ? `${accountLockoutInfo.remainingHours} hours and ${accountLockoutInfo.remainingMinutes} minutes` 
+      : `${accountLockoutInfo.remainingMinutes} minutes`;
+    return {
+      success: false,
+      message: `ACCOUNT LOCKED FOR 24 HOURS due to 5 consecutive wrong password attempts. Please try again in ${timeStr} (or use "Forgot Password?" to reset).`,
+    };
+  }
+
+  if ((authMethod === 'PASSWORD_BIOMETRIC' || authMethod === 'PASSWORD') && !isBiometricVerified) {
     const customPass = getCustomStoredPassword(cleanInput) || getCustomStoredPassword(account.accountIdentifier);
     const validPassword = customPass || account.password;
 
-    if (passwordInput !== validPassword && passwordInput !== 'darkwatch123') {
+    if (passwordInput !== validPassword) {
+      // Record failed password attempt
+      const failedRes = recordFailedAttempt(account.usernameOrPhone);
+      recordFailedAttempt(cleanInput);
+
+      if (failedRes.isLocked) {
+        return {
+          success: false,
+          message: 'Wrong password! You have reached the maximum 5 allowed attempts. Your account is now LOCKED FOR 24 HOURS.',
+        };
+      }
+
+      const attemptsRemaining = MAX_FAILED_ATTEMPTS - failedRes.attempts;
       return {
         success: false,
-        message: 'Incorrect password for registered account. Please check your password or use "Forgot Password?".',
+        message: `Wrong password! (${failedRes.attempts}/5 failed attempts). You have ${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining before 24-hour account lockout.`,
       };
     }
   }
+
+  // Success! Clear failed attempts
+  clearFailedAttempts(account.usernameOrPhone);
+  clearFailedAttempts(cleanInput);
 
   const profile = loginUser(account.usernameOrPhone, authMethod, account.role);
   profile.displayName = account.displayName;
@@ -422,6 +554,9 @@ export const updateUserPassword = (identifier: string, newPassword: string): boo
     });
     localStorage.setItem(REGISTERED_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
 
+    // Clear failed attempts on password update
+    clearFailedAttempts(key);
+
     return true;
   } catch (err) {
     console.error('Failed to update password', err);
@@ -446,6 +581,7 @@ export const resetUserPasswordWithOtp = (
   }
 
   updateUserPassword(clean, newPassword);
+  clearFailedAttempts(clean);
   return {
     success: true,
     message: `Password reset successfully for ${clean}. You can now log in with your new password.`,

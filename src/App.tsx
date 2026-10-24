@@ -31,7 +31,7 @@ import { SimulateAttackModal } from './components/SimulateAttackModal';
 import { PitchDeckModal } from './components/PitchDeckModal';
 import { ScanHistoryDrawer } from './components/ScanHistoryDrawer';
 import { LoginModal } from './components/LoginModal';
-import { Presentation, History, ShieldAlert } from 'lucide-react';
+import { Presentation, History, ShieldAlert, ArrowLeft } from 'lucide-react';
 
 import { 
   INITIAL_VULNERABILITIES, 
@@ -331,10 +331,32 @@ export default function App() {
           onThemeChange={setTheme}
           onLogout={handleLogout}
           onOpenPitchDeck={() => setIsPitchDeckOpen(true)}
+          onNavigateToTab={(tab) => setActiveTab(tab)}
         />
 
         {/* Tab Content Views */}
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+          {activeTab !== 'dashboard' && (
+            <div className="sticky top-[65px] z-30 p-3 bg-[#050814]/95 dark:bg-[#050814]/95 light:bg-white/95 backdrop-blur-md border border-cyan-500/40 rounded-2xl flex items-center justify-between shadow-xl mb-4 transition-all">
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/50 text-xs font-mono font-bold transition-all cursor-pointer shadow-glow-cyan active:scale-95"
+              >
+                <ArrowLeft className="w-4 h-4 text-cyan-400" />
+                <span>Back to Dashboard</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-serif font-black text-slate-900 dark:text-slate-100 capitalize">
+                  {activeTab.replace(/-/g, ' ')}
+                </span>
+                <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/60">
+                  ACTIVE VIEW
+                </span>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'dashboard' && (
             <DashboardView
               alerts={alerts}
@@ -345,6 +367,7 @@ export default function App() {
                 setActiveTab(tab);
               }}
               onOpenHistory={() => setActiveTab('scan-history')}
+              currentUser={currentUser}
             />
           )}
 
@@ -353,6 +376,8 @@ export default function App() {
               initialQuery={scannerQuery}
               initialType="URL"
               onOpenHistory={() => setActiveTab('scan-history')}
+              onBackToDashboard={() => setActiveTab('dashboard')}
+              currentUser={currentUser}
             />
           )}
 
@@ -361,6 +386,8 @@ export default function App() {
               initialQuery={scannerQuery}
               initialType="PHONE"
               onOpenHistory={() => setActiveTab('scan-history')}
+              onBackToDashboard={() => setActiveTab('dashboard')}
+              currentUser={currentUser}
             />
           )}
 
@@ -370,6 +397,8 @@ export default function App() {
                 setScannerQuery(target);
                 setActiveTab(type === 'PHONE' ? 'phone-analysis' : 'link-scanner');
               }}
+              onBackToDashboard={() => setActiveTab('dashboard')}
+              currentUser={currentUser}
             />
           )}
 
@@ -429,6 +458,7 @@ export default function App() {
             <AccountSettingsView
               currentUser={currentUser}
               onLogout={handleLogout}
+              onBackToDashboard={() => setActiveTab('dashboard')}
             />
           )}
 
@@ -467,7 +497,12 @@ export default function App() {
           {/* Bottom copyright & quick actions */}
           <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-white">DarkWatch AI</span>
+              <span className="font-serif font-extrabold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
+                <span>DarkWatch</span>
+                <span className="not-italic px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-900 text-cyan-300 dark:bg-cyan-950 dark:text-cyan-300 border border-cyan-700/50 shadow-glow-cyan inline-block">
+                  AI
+                </span>
+              </span>
               <span>— Cyber Threat Early Warning & Vulnerability Response</span>
             </div>
 

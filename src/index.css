@@ -35,6 +35,89 @@
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
+
+  .font-darkwatch,
+  .font-times-roman,
+  .font-brand-times,
+  .font-serif {
+    font-family: 'Times New Roman', Times, Georgia, serif !important;
+  }
+}
+
+/* =========================================================================
+   DARKWATCH BRAND & HEADING CSS STYLES (SOLID COLORS - NO GRADIENTS)
+   ========================================================================= */
+
+/* Default / Dark Mode */
+.welcome-title {
+  color: #F8FAFC !important;
+  background: none !important;
+  -webkit-text-fill-color: #F8FAFC !important;
+  text-shadow: none !important;
+}
+
+.brand-name {
+  color: #F8FAFC !important;
+  background: none !important;
+  -webkit-text-fill-color: #F8FAFC !important;
+  text-shadow: none !important;
+}
+
+.ai-label {
+  display: inline-block !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: #22D3EE !important;
+  margin-left: 5px !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  -webkit-text-fill-color: #22D3EE !important;
+  text-shadow: none !important;
+  vertical-align: baseline !important;
+  font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  font-style: normal !important;
+}
+
+.security-analysis-title {
+  font-family: "Times New Roman", Times, serif !important;
+  font-size: 26px !important;
+  font-weight: 700 !important;
+  color: #F8FAFC !important;
+  background: none !important;
+  -webkit-text-fill-color: #F8FAFC !important;
+  text-shadow: none !important;
+}
+
+/* Light Mode Overrides */
+body.light .welcome-title,
+html[data-theme="light"] .welcome-title,
+body.light .brand-name,
+html[data-theme="light"] .brand-name {
+  color: #172033 !important;
+  -webkit-text-fill-color: #172033 !important;
+  background: none !important;
+  text-shadow: none !important;
+}
+
+body.light .ai-label,
+html[data-theme="light"] .ai-label {
+  color: #087E9B !important;
+  -webkit-text-fill-color: #087E9B !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  text-shadow: none !important;
+}
+
+body.light .security-analysis-title,
+html[data-theme="light"] .security-analysis-title {
+  color: #172033 !important;
+  -webkit-text-fill-color: #172033 !important;
+  background: none !important;
+  text-shadow: none !important;
 }
 
 /* =========================================================================
@@ -53,21 +136,16 @@ body.light .cyber-card:hover {
 }
 
 body.light header {
-  background-color: rgba(255, 255, 255, 0.96) !important;
+  background-color: rgba(255, 255, 255, 0.98) !important;
   border-bottom: 1px solid #cbd5e1 !important;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
 }
 
-body.light footer {
+body.light header .rounded-full.bg-[#070b1a],
+body.light header .rounded-full.bg-[#050817],
+body.light header .rounded-full.bg-slate-950 {
   background-color: #f1f5f9 !important;
-  border-top: 1px solid #cbd5e1 !important;
-  color: #334155 !important;
-}
-
-body.light footer > div:first-child {
-  background-color: #e2e8f0 !important;
-  border-bottom: 1px solid #cbd5e1 !important;
-  color: #1e293b !important;
+  color: #0f172a !important;
 }
 
 /* Gradient card overrides */
@@ -82,9 +160,23 @@ body.light [class*="from-[#090d26]"] {
   color: #0f172a !important;
 }
 
-/* Text color adaptations */
+/* Text color adaptations for Light Mode */
 body.light .text-white {
   color: #0f172a !important;
+}
+
+body.light .text-transparent.bg-clip-text {
+  background-image: linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #0369a1 100%) !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: initial !important;
+}
+
+body.light h1 .text-transparent.bg-clip-text,
+body.light h2 .text-transparent.bg-clip-text,
+body.light h3 .text-transparent.bg-clip-text,
+body.light span .text-transparent.bg-clip-text {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
 }
 
 body.light .text-slate-100,

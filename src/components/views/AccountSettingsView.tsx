@@ -8,32 +8,29 @@
 import React, { useState } from 'react';
 import { 
   User, 
-  Shield, 
-  Key, 
   Lock, 
   CheckCircle2, 
-  RefreshCw, 
   LogOut, 
-  Info,
   Eye,
   EyeOff,
-  AlertTriangle
+  AlertTriangle,
+  ArrowLeft
 } from 'lucide-react';
 import { UserProfile, updateStoredUser, updateUserPassword } from '../../utils/auth-store';
-import { UserRole } from '../../utils/security-engine';
 import { cyberAudio } from '../../utils/cyber-audio';
 
 interface AccountSettingsViewProps {
   currentUser: UserProfile | null;
   onLogout: () => void;
+  onBackToDashboard?: () => void;
 }
 
 export const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
   currentUser,
   onLogout,
+  onBackToDashboard,
 }) => {
   const [displayName, setDisplayName] = useState<string>(currentUser?.displayName || 'SecOps Lead');
-  const [role, setRole] = useState<UserRole>(currentUser?.role || 'SECOPS_ADMIN');
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
 
   // Change Password State
@@ -49,7 +46,6 @@ export const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
       updateStoredUser({
         ...currentUser,
         displayName,
-        role,
       });
       setSavedSuccess(true);
       cyberAudio.playSuccess();
@@ -105,23 +101,35 @@ export const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Manage your authenticated analyst profile, operational access tier, and session credentials.
+            Manage your display name and change account authentication password.
           </p>
         </div>
 
-        <button
-          onClick={onLogout}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-800/60 text-xs font-mono font-bold transition-all cursor-pointer"
-        >
-          <LogOut className="w-4 h-4 text-red-400" />
-          <span>Sign Out</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onBackToDashboard && (
+            <button
+              onClick={onBackToDashboard}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 text-xs font-mono font-bold transition-all cursor-pointer shadow-glow-cyan"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Dashboard</span>
+            </button>
+          )}
+
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-800/60 text-xs font-mono font-bold transition-all cursor-pointer"
+          >
+            <LogOut className="w-4 h-4 text-red-400" />
+            <span>Sign Out</span>
+          </button>
+        </div>
       </div>
 
       {savedSuccess && (
         <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex items-center gap-2 text-emerald-300 text-xs font-mono animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-          <span>Profile configuration saved successfully. Access policies synchronized.</span>
+          <span>Display name updated successfully.</span>
         </div>
       )}
 
@@ -140,39 +148,26 @@ export const AccountSettingsView: React.FC<AccountSettingsViewProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-slate-800">
+        <div className="pt-4 border-t border-slate-800 space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-mono font-bold text-slate-400">Display Name</label>
             <input
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Enter your display name..."
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-cyan-500 outline-none font-mono"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-mono font-bold text-slate-400">Assigned Role & RBAC Tier</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-cyan-500 outline-none font-mono cursor-pointer"
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={handleSaveProfile}
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-mono text-xs font-bold transition-all shadow-glow-cyan cursor-pointer"
             >
-              <option value="SECOPS_ADMIN">SECOPS_ADMIN (Full Threat & Patch Authority)</option>
-              <option value="TIER2_ANALYST">TIER2_ANALYST (Triage & Mitigation Approval)</option>
-              <option value="COMPLIANCE_OFFICER">COMPLIANCE_OFFICER (Governance & Audit Logs)</option>
-              <option value="READ_ONLY_OPERATOR">READ_ONLY_OPERATOR (Telemetry Inspection Only)</option>
-            </select>
+              Save Account Changes
+            </button>
           </div>
-        </div>
-
-        <div className="flex justify-end pt-2">
-          <button
-            onClick={handleSaveProfile}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-mono text-xs font-bold transition-all shadow-glow-cyan cursor-pointer"
-          >
-            Save Account Changes
-          </button>
         </div>
       </div>
 

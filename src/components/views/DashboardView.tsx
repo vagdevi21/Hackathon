@@ -33,12 +33,15 @@ import { getScanHistory, saveScanHistoryItem, ScanHistoryRecord } from '../../ut
 import { analyzeWebsiteUrl, analyzePhoneNumber, DetailedAnalysisResult } from '../../services/link-analyzer';
 import { cyberAudio } from '../../utils/cyber-audio';
 
+import { UserProfile } from '../../utils/auth-store';
+
 interface DashboardViewProps {
   alerts: ThreatAlert[];
   onSelectAlert: (alert: ThreatAlert) => void;
   onOpenSimulateAttack: () => void;
   onNavigateToTab?: (tab: string, initialQuery?: string) => void;
   onOpenHistory?: () => void;
+  currentUser?: UserProfile | null;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -47,20 +50,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenSimulateAttack,
   onNavigateToTab,
   onOpenHistory,
+  currentUser,
 }) => {
   const [targetType, setTargetType] = useState<'URL' | 'PHONE'>('URL');
   const [inputQuery, setInputQuery] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [latestAnalysis, setLatestAnalysis] = useState<DetailedAnalysisResult | null>(null);
-  const [historyItems, setHistoryItems] = useState<ScanHistoryRecord[]>(() => getScanHistory());
+  const [historyItems, setHistoryItems] = useState<ScanHistoryRecord[]>(() => getScanHistory(currentUser?.username));
 
   useEffect(() => {
     const handleUpdate = () => {
-      setHistoryItems(getScanHistory());
+      setHistoryItems(getScanHistory(currentUser?.username));
     };
     window.addEventListener('darkwatch_history_updated', handleUpdate);
     return () => window.removeEventListener('darkwatch_history_updated', handleUpdate);
-  }, []);
+  }, [currentUser?.username]);
 
   const handleRunAnalysis = () => {
     const raw = inputQuery.trim();
@@ -69,14 +73,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setIsAnalyzing(true);
     cyberAudio.playScan();
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const isPhone = targetType === 'PHONE' || raw.startsWith('+') || /^\d[\d\s\-\(\)]{6,}$/.test(raw);
-      const result = isPhone ? analyzePhoneNumber(raw) : analyzeWebsiteUrl(raw);
+      const result = isPhone ? await analyzePhoneNumber(raw) : analyzeWebsiteUrl(raw);
 
       setLatestAnalysis(result);
       setIsAnalyzing(false);
 
-      // Persist to scan history
+      // Persist to scan history with user identity
       saveScanHistoryItem({
         query: result.target,
         targetType: result.type,
@@ -89,7 +93,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           .map((f) => f.name),
         totalBlacklistsChecked: result.riskFactors.length,
         isSaved: true,
-      });
+      }, currentUser?.username);
 
       cyberAudio.playSuccess();
     }, 600);
@@ -101,12 +105,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6 animate-fadeIn max-w-6xl mx-auto">
-      {/* 1. Welcome Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
+      {/* 1. Welcome Header - Clean High-Contrast Adaptive Styling */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-3 border-b border-slate-200 dark:border-slate-800/80">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Welcome to DarkWatch AI
+          <h1 className="welcome-title text-3xl sm:text-4xl md:text-5xl font-serif font-extrabold tracking-tight flex flex-wrap items-center">
+            <span className="welcome-title">Welcome to</span>
+            <span className="brand-name ml-2">DarkWatch</span>
+            <span className="ai-label">AI</span>
           </h1>
+          <p className="text-xs sm:text-sm text-slate-700 dark:text-cyan-300/90 font-sans font-medium tracking-wide mt-1.5">
+            Intelligent Cyber Threat Early Warning & Real-Time Incident Defense
+          </p>
         </div>
       </div>
 
@@ -118,7 +127,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <ShieldAlert className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <h2 className="security-analysis-title flex items-center gap-2">
                 Intelligent Security Analysis
               </h2>
             </div>

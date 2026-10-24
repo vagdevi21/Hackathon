@@ -5,7 +5,7 @@
  * Derived dynamically from verified findings or displays honest empty state when no data exists.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PieChart, ShieldCheck, AlertCircle } from 'lucide-react';
 import { ThreatCategoryDistribution } from '../services/link-analyzer';
 import { getScanHistory } from '../utils/scan-history-store';
@@ -66,6 +66,14 @@ export const ThreatDistributionDonut: React.FC<ThreatDistributionDonutProps> = (
   }
 
   const [activeItem, setActiveItem] = useState<ThreatCategoryDistribution | null>(items[0] || null);
+
+  useEffect(() => {
+    if (items.length > 0) {
+      setActiveItem(items[0]);
+    } else {
+      setActiveItem(null);
+    }
+  }, [customDistribution]);
 
   if (items.length === 0) {
     return (

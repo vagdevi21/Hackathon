@@ -39,6 +39,7 @@ interface HeaderProps {
   onLogout: () => void;
   onOpenSecuritySettings?: () => void;
   onOpenPitchDeck: () => void;
+  onNavigateToTab?: (tab: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -50,6 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
   onThemeChange,
   onLogout,
   onOpenPitchDeck,
+  onNavigateToTab,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
@@ -145,11 +147,12 @@ export const Header: React.FC<HeaderProps> = ({
           <Menu className="w-5 h-5 text-cyan-400" />
         </button>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <CyberLogoIcon size={30} className="hidden sm:inline-flex" />
-          <div className="hidden sm:block">
-            <span className="text-base font-black tracking-tight text-white leading-none">
-              Dark<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">Watch</span>
+          <div className="hidden sm:block text-left">
+            <span className="text-base font-serif font-extrabold tracking-tight flex items-center leading-none">
+              <span className="brand-name">DarkWatch</span>
+              <span className="ai-label">AI</span>
             </span>
           </div>
         </div>
@@ -223,7 +226,7 @@ export const Header: React.FC<HeaderProps> = ({
           >
             {/* Circular Avatar: 38-42px diameter, cyan-to-violet gradient, subtle glow */}
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-cyan-500 via-indigo-600 to-purple-600 p-0.5 shadow-glow-cyan flex items-center justify-center transition-transform group-hover:scale-105">
-              <div className="w-full h-full rounded-full bg-[#070b1a] flex items-center justify-center text-white font-bold text-xs sm:text-sm font-mono tracking-tight">
+              <div className="w-full h-full rounded-full bg-slate-950 dark:bg-[#070b1a] light:bg-slate-100 flex items-center justify-center text-white dark:text-white light:text-slate-900 font-bold text-xs sm:text-sm font-mono tracking-tight">
                 {userInitial}
               </div>
             </div>
@@ -239,7 +242,7 @@ export const Header: React.FC<HeaderProps> = ({
               {/* Profile Header: Avatar + User Info */}
               <div className="flex items-center gap-3 pb-3 border-b border-slate-800/80">
                 <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-cyan-400 to-purple-600 p-0.5 flex-shrink-0 shadow-glow-cyan flex items-center justify-center">
-                  <div className="w-full h-full rounded-full bg-[#050817] flex items-center justify-center text-white font-black text-base font-mono">
+                  <div className="w-full h-full rounded-full bg-slate-950 dark:bg-[#050817] light:bg-slate-100 flex items-center justify-center text-white dark:text-white light:text-slate-900 font-black text-base font-mono">
                     {userInitial}
                   </div>
                 </div>
@@ -256,6 +259,17 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Menu Links */}
               <div className="pt-2 border-t border-slate-800/80 space-y-1 text-xs font-medium">
+                <button
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    onNavigateToTab?.('account-settings');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-200 hover:text-white hover:bg-cyan-600/20 hover:border-cyan-500/40 border border-transparent transition-all text-left font-bold cursor-pointer"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Account Settings (Change Password & Name)</span>
+                </button>
+
                 <button
                   onClick={() => {
                     setIsDropdownOpen(false);

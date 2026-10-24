@@ -318,6 +318,38 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }
   };
 
+  const resetAndSwitchToRegister = () => {
+    setScreenMode('REGISTER');
+    setUsernameInput('');
+    setPassword('');
+    setShowPassword(false);
+    setErrorMsg(null);
+    setRegErrorMsg(null);
+    setSuccessMsg(null);
+    setIsBiometricVerified(false);
+    setIsOtpVerified(false);
+    setIsFaceVerified(false);
+    setRegDisplayName('');
+    setRegUsername('');
+    setRegPassword('');
+    setRegConfirmPassword('');
+    cyberAudio.playClick();
+  };
+
+  const resetAndSwitchToLogin = () => {
+    setScreenMode('LOGIN');
+    setUsernameInput('');
+    setPassword('');
+    setShowPassword(false);
+    setErrorMsg(null);
+    setRegErrorMsg(null);
+    setSuccessMsg(null);
+    setIsBiometricVerified(false);
+    setIsOtpVerified(false);
+    setIsFaceVerified(false);
+    cyberAudio.playClick();
+  };
+
   // Handle Login Form Submission
   const handleAuthenticate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -344,8 +376,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     cyberAudio.playClick();
 
     setTimeout(() => {
-      // STRICT REGISTRATION & CREDENTIAL CHECK
-      const authRes = authenticateRegisteredUser(userQuery, password, authMethod);
+      // STRICT REGISTRATION & CREDENTIAL CHECK WITH BIOMETRIC PASSKEY
+      const authRes = authenticateRegisteredUser(userQuery, password, authMethod, isBiometricVerified);
       setIsLoading(false);
 
       if (!authRes.success || !authRes.userProfile) {
@@ -375,8 +407,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             isPulsing={isLoading || isBiometricScanning || isFaceScanning || isOtpVerified} 
           />
           <div>
-            <span className="text-xl sm:text-2xl font-black tracking-tight text-white font-mono">
-              Dark<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">Watch</span> AI
+            <span className="text-xl sm:text-2xl font-serif font-black tracking-tight text-white flex items-center">
+              <span className="brand-name">DarkWatch</span>
+              <span className="ai-label">AI</span>
             </span>
             <span className="text-[11px] font-mono text-slate-400 block">
               Cyber Threat Early Warning & Vulnerability Response
@@ -397,11 +430,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </div>
 
             <div className="space-y-4">
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-none font-mono">
-                Dark<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400">Watch</span>{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-400">AI</span>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-black tracking-tight flex items-center justify-center lg:justify-start">
+                <span className="brand-name">DarkWatch</span>
+                <span className="ai-label">AI</span>
               </h1>
-              <p className="text-lg sm:text-xl font-medium text-cyan-300/90 tracking-wide font-mono">
+              <p className="text-lg sm:text-xl font-semibold text-cyan-300/90 tracking-wide font-sans">
                 "Detect Early. Defend Smarter. Stay Secure."
               </p>
             </div>
@@ -419,12 +452,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-950/90 border border-slate-800 text-xs font-semibold">
                   <button
                     type="button"
-                    onClick={() => {
-                      setScreenMode('LOGIN');
-                      setErrorMsg(null);
-                      setRegErrorMsg(null);
-                      cyberAudio.playClick();
-                    }}
+                    onClick={resetAndSwitchToLogin}
                     className={`py-2.5 px-3 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold tracking-wide ${
                       screenMode === 'LOGIN'
                         ? 'bg-cyan-600 text-white shadow-glow-cyan'
@@ -437,12 +465,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setScreenMode('REGISTER');
-                      setErrorMsg(null);
-                      setRegErrorMsg(null);
-                      cyberAudio.playClick();
-                    }}
+                    onClick={resetAndSwitchToRegister}
                     className={`py-2.5 px-3 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 font-bold tracking-wide ${
                       screenMode === 'REGISTER'
                         ? 'bg-gradient-to-r from-cyan-600 to-purple-600 text-white shadow-glow-cyan'
@@ -462,7 +485,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       <span>Strict Account Security: First-time users must Register an account before logging in.</span>
                     </div>
 
-                    {/* 1. Username or Mobile Number Input */}
+                    {/* Username or Mobile Number Input (Placed First) */}
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
@@ -483,7 +506,35 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       </div>
                     </div>
 
-                    {/* DYNAMIC FORM FIELDS BASED ON SELECTED METHOD */}
+                    {/* Authentication Method Dropdown Selector */}
+                    <div className="space-y-1.5 pt-1">
+                      <label className="text-xs font-semibold text-slate-300 flex items-center justify-between font-mono">
+                        <span className="flex items-center gap-1.5">
+                          <KeyRound className="w-3.5 h-3.5 text-purple-400" />
+                          Authentication Method:
+                        </span>
+                        <span className="text-[10px] text-cyan-400 font-bold">3 SECURE MODES</span>
+                      </label>
+
+                      <div className="relative">
+                        <select
+                          value={authMethod}
+                          onChange={(e) => {
+                            setAuthMethod(e.target.value as AuthMethod);
+                            setErrorMsg(null);
+                            setSuccessMsg(null);
+                          }}
+                          className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-slate-800 focus:border-cyan-400 text-white font-mono text-xs sm:text-sm appearance-none outline-none cursor-pointer pr-10 transition-colors shadow-inner"
+                        >
+                          <option value="PASSWORD_BIOMETRIC">1. Password / Biometric Authentication</option>
+                          <option value="MOBILE_OTP">2. Mobile OTP Authentication</option>
+                          <option value="FACE_AUTH">3. Face Authentication</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    {/* DYNAMIC FORM FIELDS BASED ON SELECTED METHOD (ACCOUNT PASSWORD / OTP / FACE) */}
                     <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 transition-all">
                       
                       {/* Method 1: Password / Biometric */}
@@ -768,34 +819,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       )}
                     </div>
 
-                    {/* Authentication Method Dropdown Selector (Moved Below Account Password / Dynamic Method Section) */}
-                    <div className="space-y-1.5 pt-1">
-                      <label className="text-xs font-semibold text-slate-300 flex items-center justify-between font-mono">
-                        <span className="flex items-center gap-1.5">
-                          <KeyRound className="w-3.5 h-3.5 text-purple-400" />
-                          Authentication Method:
-                        </span>
-                        <span className="text-[10px] text-cyan-400 font-bold">3 SECURE MODES</span>
-                      </label>
-
-                      <div className="relative">
-                        <select
-                          value={authMethod}
-                          onChange={(e) => {
-                            setAuthMethod(e.target.value as AuthMethod);
-                            setErrorMsg(null);
-                            setSuccessMsg(null);
-                          }}
-                          className="w-full px-4 py-3 rounded-xl bg-slate-950/90 border border-slate-800 focus:border-cyan-400 text-white font-mono text-xs sm:text-sm appearance-none outline-none cursor-pointer pr-10 transition-colors shadow-inner"
-                        >
-                          <option value="PASSWORD_BIOMETRIC">1. Password / Biometric Authentication</option>
-                          <option value="MOBILE_OTP">2. Mobile OTP Authentication</option>
-                          <option value="FACE_AUTH">3. Face Authentication</option>
-                        </select>
-                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      </div>
-                    </div>
-
                     {/* Feedback Banners */}
                     {errorMsg && (
                       <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/60 text-red-300 text-xs font-mono flex items-center gap-2 animate-fadeIn shadow-glow-rose">
@@ -834,12 +857,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                     <div className="flex items-center justify-center text-[11px] text-slate-400 pt-1">
                       <button
                         type="button"
-                        onClick={() => {
-                          setScreenMode('REGISTER');
-                          setErrorMsg(null);
-                          setRegErrorMsg(null);
-                          cyberAudio.playClick();
-                        }}
+                        onClick={resetAndSwitchToRegister}
                         className="text-cyan-400 hover:underline cursor-pointer font-mono font-bold"
                       >
                         New User? Click Here to Register Account First →
@@ -941,12 +959,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                     <div className="flex items-center justify-center text-[11px] text-slate-400 pt-1">
                       <button
                         type="button"
-                        onClick={() => {
-                          setScreenMode('LOGIN');
-                          setErrorMsg(null);
-                          setRegErrorMsg(null);
-                          cyberAudio.playClick();
-                        }}
+                        onClick={resetAndSwitchToLogin}
                         className="text-cyan-400 hover:underline cursor-pointer font-mono font-bold"
                       >
                         Already Registered? Click Here to Sign In →

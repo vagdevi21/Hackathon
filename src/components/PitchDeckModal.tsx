@@ -35,8 +35,12 @@ export const PitchDeckModal: React.FC<PitchDeckModalProps> = ({ isOpen, onClose 
         <div className="px-5 py-3 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Presentation className="w-4 h-4 text-purple-400" />
-            <span className="text-xs font-bold font-mono text-purple-300">
-              DarkWatch AI Pitch Deck • Team SYNORA
+            <span className="text-xs font-bold font-serif text-purple-300 flex items-center gap-1.5">
+              <span>DarkWatch</span>
+              <span className="not-italic px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-slate-900 text-cyan-300 dark:bg-cyan-950 dark:text-cyan-300 border border-cyan-700/50 inline-block">
+                AI
+              </span>
+              <span>Pitch Deck • Team SYNORA</span>
             </span>
           </div>
 

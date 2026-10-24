@@ -104,7 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'dashboard', label: 'Dashboard', icon: Layers },
         { id: 'link-scanner', label: 'URL & Phone Scam Scanner', icon: Link2 },
         { id: 'phone-analysis', label: 'Phone Number Analysis', icon: Phone },
-        { id: 'scan-history', label: 'Scan History', icon: History, badge: historyCount },
+        { id: 'scan-history', label: 'Scan History', icon: History },
       ],
     },
     {
@@ -184,13 +184,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <CyberLogoIcon size={34} />
             {!isCollapsed && (
               <div className="truncate">
-                <span className="text-lg font-black tracking-tight text-white block leading-none">
-                  Dark<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">Watch</span>
-                  <span className="ml-1 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/50">
-                    AI
-                  </span>
+                <span className="text-lg font-serif font-extrabold tracking-tight flex items-center leading-none">
+                  <span className="brand-name">DarkWatch</span>
+                  <span className="ai-label">AI</span>
                 </span>
-                <span className="text-[10px] font-mono text-cyan-300/80 block mt-0.5 truncate">
+                <span className="text-[10px] font-mono text-cyan-700 dark:text-cyan-300/80 block mt-0.5 truncate">
                   Cyber Early Warning
                 </span>
               </div>

@@ -16,9 +16,11 @@ import {
   AlertTriangle, 
   CheckCircle2, 
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
   Download,
-  ExternalLink
+  ExternalLink,
+  User
 } from 'lucide-react';
 import { 
   ScanHistoryRecord, 
@@ -29,23 +31,30 @@ import {
   seedSampleScans 
 } from '../../utils/scan-history-store';
 import { cyberAudio } from '../../utils/cyber-audio';
+import { UserProfile } from '../../utils/auth-store';
 
 interface ScanHistoryViewProps {
   onNavigateToScan: (target: string, type: 'URL' | 'PHONE') => void;
+  onBackToDashboard?: () => void;
+  currentUser?: UserProfile | null;
 }
 
-export const ScanHistoryView: React.FC<ScanHistoryViewProps> = ({ onNavigateToScan }) => {
-  const [history, setHistory] = useState<ScanHistoryRecord[]>(() => getScanHistory());
+export const ScanHistoryView: React.FC<ScanHistoryViewProps> = ({ 
+  onNavigateToScan,
+  onBackToDashboard,
+  currentUser,
+}) => {
+  const [history, setHistory] = useState<ScanHistoryRecord[]>(() => getScanHistory(currentUser?.username));
   const [filterType, setFilterType] = useState<'ALL' | 'URL' | 'PHONE' | 'SAVED'>('ALL');
   const [search, setSearch] = useState<string>('');
 
   useEffect(() => {
     const handleUpdate = () => {
-      setHistory(getScanHistory());
+      setHistory(getScanHistory(currentUser?.username));
     };
     window.addEventListener('darkwatch_history_updated', handleUpdate);
     return () => window.removeEventListener('darkwatch_history_updated', handleUpdate);
-  }, []);
+  }, [currentUser?.username]);
 
   const filteredHistory = history.filter((item) => {
     if (filterType === 'URL' && item.targetType !== 'URL') return false;
@@ -88,13 +97,29 @@ export const ScanHistoryView: React.FC<ScanHistoryViewProps> = ({ onNavigateToSc
             <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/50">
               {history.length} RECORDS
             </span>
+            {currentUser && (
+              <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-950 text-purple-300 border border-purple-700/50 flex items-center gap-1">
+                <User className="w-3 h-3 text-purple-400" />
+                {currentUser.displayName || currentUser.username}
+              </span>
+            )}
           </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Local persistent archive of all analyzed URLs, phone numbers, threat ratings, and forensic evidence.
+            Persistent database archive of all analyzed URLs, phone numbers, threat ratings, and forensic evidence for {currentUser?.displayName || 'your account'}.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          {onBackToDashboard && (
+            <button
+              onClick={onBackToDashboard}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 text-xs font-mono font-bold transition-all cursor-pointer shadow-glow-cyan"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Dashboard</span>
+            </button>
+          )}
+
           {history.length > 0 && (
             <>
               <button
@@ -107,8 +132,8 @@ export const ScanHistoryView: React.FC<ScanHistoryViewProps> = ({ onNavigateToSc
               </button>
               <button
                 onClick={() => {
-                  if (confirm('Clear all stored scan history? This action cannot be undone.')) {
-                    clearAllScanHistory();
+                  if (confirm('Clear all stored scan history for your account? This action cannot be undone.')) {
+                    clearAllScanHistory(currentUser?.username);
                   }
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-900/40 text-xs font-mono font-bold transition-colors cursor-pointer"
