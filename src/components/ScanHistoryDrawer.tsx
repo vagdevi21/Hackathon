@@ -117,9 +117,10 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({
   };
 
   const handleClearAll = () => {
-    clearAllScanHistory();
-    setHistoryList([]);
-    cyberAudio.playWarning();
+    if (window.confirm('Clear all search history records from persistent local storage?')) {
+      clearAllScanHistory();
+      cyberAudio.playWarning();
+    }
   };
 
   const totalSearches = historyList.length;

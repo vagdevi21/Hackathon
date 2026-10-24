@@ -104,7 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'dashboard', label: 'Dashboard', icon: Layers },
         { id: 'link-scanner', label: 'URL & Phone Scam Scanner', icon: Link2 },
         { id: 'phone-analysis', label: 'Phone Number Analysis', icon: Phone },
-        { id: 'scan-history', label: 'Scan History', icon: History },
+        { id: 'scan-history', label: 'Scan History', icon: History, badge: historyCount },
       ],
     },
     {

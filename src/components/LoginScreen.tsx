@@ -40,7 +40,6 @@ import {
   X
 } from 'lucide-react';
 import { CyberLogoIcon } from './CyberLogoIcon';
-import { CyberBackground } from './CyberBackground';
 import { 
   AuthMethod, 
   UserProfile, 
@@ -395,45 +394,47 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
   return (
     <div className="min-h-screen w-full bg-[#030614] text-slate-100 flex flex-col justify-between relative overflow-hidden font-sans select-none">
-      {/* Animated Cybersecurity Background shared across Desktop and Mobile */}
-      <CyberBackground />
+      {/* Background Cyber Grid & Radiant Ambience */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#06b6d40a_1px,transparent_1px),linear-gradient(to_bottom,#06b6d40a_1px,transparent_1px)] bg-[size:3rem_3rem] pointer-events-none" />
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-cyan-600/15 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-purple-600/15 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* Top Header - Minimal Status Bar on Desktop */}
-      <header className="relative z-10 w-full max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-cyan-400/80">
-          <Shield className="w-4 h-4 text-cyan-400" />
-          <span>DARKWATCH SOC ZERO-TRUST GATEWAY</span>
-        </div>
-        <div className="ml-auto text-[11px] font-mono text-slate-500">
-          SYSTEM STATUS: <span className="text-emerald-400 font-bold">ONLINE</span>
+      {/* Top Clean Header with New Biometric Fingerprint Emblem */}
+      <header className="relative z-10 w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-3.5">
+          <CyberLogoIcon 
+            size={42} 
+            isPulsing={isLoading || isBiometricScanning || isFaceScanning || isOtpVerified} 
+          />
+          <div>
+            <span className="text-xl sm:text-2xl font-serif font-black tracking-tight text-white flex items-center">
+              <span className="brand-name">DarkWatch</span>
+              <span className="ai-label">AI</span>
+            </span>
+            <span className="text-[11px] font-mono text-slate-400 block">
+              Cyber Threat Early Warning & Vulnerability Response
+            </span>
+          </div>
         </div>
       </header>
 
-      {/* Main Container - Single Brand Block on Mobile, 2-Column Split on Desktop */}
-      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 lg:py-8 flex items-center justify-center">
+      {/* Main Split Layout Container */}
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex items-center justify-center">
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           
-          {/* Brand Column: Single Brand Block on Mobile and Left Column on Desktop */}
-          <div className="lg:col-span-6 space-y-5 text-center lg:text-left flex flex-col items-center lg:items-start">
-            {/* Custom Vector Emblem */}
-            <CyberLogoIcon 
-              size={64} 
-              isPulsing={isLoading || isBiometricScanning || isFaceScanning || isOtpVerified} 
-            />
-
-            {/* Subtitle Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-semibold shadow-glow-cyan">
+          {/* Left Column: Branding, Cybersecurity Vision & Capabilities */}
+          <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-950/70 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-semibold shadow-glow-cyan">
               <Shield className="w-3.5 h-3.5 text-cyan-400" />
               <span>Cyber Threat Early Warning & Vulnerability Response</span>
             </div>
 
-            {/* Wordmark & Tagline */}
-            <div className="space-y-2">
+            <div className="space-y-4">
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-black tracking-tight flex items-center justify-center lg:justify-start">
                 <span className="brand-name">DarkWatch</span>
                 <span className="ai-label">AI</span>
               </h1>
-              <p className="text-base sm:text-lg font-semibold text-cyan-300/90 tracking-wide font-sans">
+              <p className="text-lg sm:text-xl font-semibold text-cyan-300/90 tracking-wide font-sans">
                 "Detect Early. Defend Smarter. Stay Secure."
               </p>
             </div>

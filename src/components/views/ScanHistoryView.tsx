@@ -47,7 +47,6 @@ export const ScanHistoryView: React.FC<ScanHistoryViewProps> = ({
   const [history, setHistory] = useState<ScanHistoryRecord[]>(() => getScanHistory(currentUser?.username));
   const [filterType, setFilterType] = useState<'ALL' | 'URL' | 'PHONE' | 'SAVED'>('ALL');
   const [search, setSearch] = useState<string>('');
-  const [showConfirmClear, setShowConfirmClear] = useState<boolean>(false);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -131,36 +130,17 @@ export const ScanHistoryView: React.FC<ScanHistoryViewProps> = ({
                 <Download className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Export JSON</span>
               </button>
-              {showConfirmClear ? (
-                <div className="flex items-center gap-2 animate-fadeIn">
-                  <button
-                    onClick={() => {
-                      clearAllScanHistory(currentUser?.username);
-                      setHistory([]);
-                      setShowConfirmClear(false);
-                      cyberAudio.playWarning();
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-mono font-bold transition-all cursor-pointer shadow-glow-rose"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Confirm Clear All</span>
-                  </button>
-                  <button
-                    onClick={() => setShowConfirmClear(false)}
-                    className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowConfirmClear(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-900/40 text-xs font-mono font-bold transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                  <span>Clear All</span>
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  if (confirm('Clear all stored scan history for your account? This action cannot be undone.')) {
+                    clearAllScanHistory(currentUser?.username);
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-900/40 text-xs font-mono font-bold transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                <span>Clear All</span>
+              </button>
             </>
           )}
         </div>
