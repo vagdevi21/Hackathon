@@ -9,7 +9,6 @@ import React, { useState, useEffect } from 'react';
 import { Header, AppTheme } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { LoginScreen } from './components/LoginScreen';
-import { SecuritySettingsModal } from './components/SecuritySettingsModal';
 import { DashboardView } from './components/views/DashboardView';
 import { ThreatTriageView } from './components/views/ThreatTriageView';
 import { VulnerabilityView } from './components/views/VulnerabilityView';
@@ -18,6 +17,15 @@ import { SiemPipelineView } from './components/views/SiemPipelineView';
 import { AiPlaybooksView } from './components/views/AiPlaybooksView';
 import { GovernanceAuditView } from './components/views/GovernanceAuditView';
 import { LinkRiskScannerView } from './components/views/LinkRiskScannerView';
+import { AttackMapView } from './components/views/AttackMapView';
+import { ThreatHeatmapView } from './components/views/ThreatHeatmapView';
+import { ThreatTrendsView } from './components/views/ThreatTrendsView';
+import { ThreatDistributionView } from './components/views/ThreatDistributionView';
+import { ThreatForecastingView } from './components/views/ThreatForecastingView';
+import { NetworkTopologyView } from './components/views/NetworkTopologyView';
+import { ThreatFeedView } from './components/views/ThreatFeedView';
+import { ScanHistoryView } from './components/views/ScanHistoryView';
+import { AccountSettingsView } from './components/views/AccountSettingsView';
 import { ThreatDetailDrawer } from './components/ThreatDetailDrawer';
 import { SimulateAttackModal } from './components/SimulateAttackModal';
 import { PitchDeckModal } from './components/PitchDeckModal';
@@ -64,7 +72,6 @@ export default function App() {
   const [isAttackModalOpen, setIsAttackModalOpen] = useState<boolean>(false);
   const [isPitchDeckOpen, setIsPitchDeckOpen] = useState<boolean>(false);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState<boolean>(false);
-  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState<boolean>(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [scannerQuery, setScannerQuery] = useState<string>('');
 
@@ -308,7 +315,6 @@ export default function App() {
         onOpenSimulateAttack={() => setIsAttackModalOpen(true)}
         onOpenHistory={() => setIsHistoryDrawerOpen(true)}
         onOpenPitchDeck={() => setIsPitchDeckOpen(true)}
-        onOpenSecuritySettings={() => setIsSecurityModalOpen(true)}
         currentUser={currentUser}
         onLogout={handleLogout}
       />
@@ -324,7 +330,6 @@ export default function App() {
           theme={theme}
           onThemeChange={setTheme}
           onLogout={handleLogout}
-          onOpenSecuritySettings={() => setIsSecurityModalOpen(true)}
           onOpenPitchDeck={() => setIsPitchDeckOpen(true)}
         />
 
@@ -339,19 +344,63 @@ export default function App() {
                 if (query) setScannerQuery(query);
                 setActiveTab(tab);
               }}
-              onOpenHistory={() => setIsHistoryDrawerOpen(true)}
+              onOpenHistory={() => setActiveTab('scan-history')}
             />
           )}
 
           {activeTab === 'link-scanner' && (
             <LinkRiskScannerView 
               initialQuery={scannerQuery}
-              onOpenHistory={() => setIsHistoryDrawerOpen(true)}
+              initialType="URL"
+              onOpenHistory={() => setActiveTab('scan-history')}
             />
           )}
 
+          {activeTab === 'phone-analysis' && (
+            <LinkRiskScannerView 
+              initialQuery={scannerQuery}
+              initialType="PHONE"
+              onOpenHistory={() => setActiveTab('scan-history')}
+            />
+          )}
+
+          {activeTab === 'scan-history' && (
+            <ScanHistoryView
+              onNavigateToScan={(target, type) => {
+                setScannerQuery(target);
+                setActiveTab(type === 'PHONE' ? 'phone-analysis' : 'link-scanner');
+              }}
+            />
+          )}
+
+          {activeTab === 'attack-map' && (
+            <AttackMapView
+              alerts={alerts}
+              onSelectAlert={setSelectedAlert}
+              onOpenSimulateAttack={() => setIsAttackModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'threat-heatmap' && <ThreatHeatmapView />}
+
           {activeTab === 'triage' && (
             <ThreatTriageView
+              alerts={alerts}
+              onSelectAlert={setSelectedAlert}
+              onOpenSimulateAttack={() => setIsAttackModalOpen(true)}
+            />
+          )}
+
+          {activeTab === 'threat-distribution' && <ThreatDistributionView />}
+
+          {activeTab === 'threat-trends' && <ThreatTrendsView />}
+
+          {activeTab === 'forecasting' && <ThreatForecastingView />}
+
+          {activeTab === 'network-topology' && <NetworkTopologyView />}
+
+          {activeTab === 'threat-feed' && (
+            <ThreatFeedView
               alerts={alerts}
               onSelectAlert={setSelectedAlert}
               onOpenSimulateAttack={() => setIsAttackModalOpen(true)}
@@ -375,6 +424,13 @@ export default function App() {
           )}
 
           {activeTab === 'siem' && <SiemPipelineView />}
+
+          {activeTab === 'account-settings' && (
+            <AccountSettingsView
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            />
+          )}
 
           {activeTab === 'playbooks' && (
             <AiPlaybooksView
@@ -401,16 +457,10 @@ export default function App() {
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>SYSTEM ONLINE</span>
               </div>
-              <span className="text-slate-700">|</span>
-              <span className="text-slate-300">SOC DEFCON 2 (ZERO-TRUST ACTIVE)</span>
-              <span className="hidden md:inline text-slate-700">|</span>
-              <span className="hidden md:inline text-cyan-400">CORE ENGINE: DARKWATCH V2.4 AI-EARLY-WARNING</span>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-cyan-300 font-semibold">TEAM SYNORA: Vagdevi • Vamsi • Surya • Tabasum • Harini</span>
-              <span className="text-slate-700">|</span>
-              <span className="text-slate-300 font-bold">UTC: {utcTime}</span>
             </div>
           </div>
 
@@ -422,24 +472,6 @@ export default function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-xs">
-              <button
-                onClick={() => setIsPitchDeckOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 font-medium text-xs transition-all cursor-pointer shadow-sm"
-                title="Open DarkWatch AI Pitch Deck Presentation"
-              >
-                <Presentation className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Pitch Deck</span>
-              </button>
-
-              <button
-                onClick={() => setIsHistoryDrawerOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 font-mono text-xs transition-all cursor-pointer"
-                title="View Search & Scan History"
-              >
-                <History className="w-3.5 h-3.5 text-purple-400" />
-                <span>Search History ({historyCount})</span>
-              </button>
-
               <span className="text-cyan-400 font-medium hidden sm:inline">
                 Detect Early. Defend Smarter. Stay Secure.
               </span>
@@ -473,12 +505,6 @@ export default function App() {
         isOpen={isHistoryDrawerOpen}
         onClose={() => setIsHistoryDrawerOpen(false)}
         onSelectRecord={handleSelectHistoryRecord}
-      />
-
-      <SecuritySettingsModal
-        isOpen={isSecurityModalOpen}
-        onClose={() => setIsSecurityModalOpen(false)}
-        currentUser={currentUser}
       />
 
       <LoginModal

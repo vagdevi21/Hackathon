@@ -81,6 +81,14 @@ class CyberAudioService {
     this.playAlertChirp();
   }
 
+  playCriticalAlert() {
+    this.playAlertChirp();
+  }
+
+  playScan() {
+    this.playClick();
+  }
+
   playChirp() {
     this.playAlertChirp();
   }

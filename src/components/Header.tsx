@@ -13,8 +13,6 @@ import {
   Menu, 
   Bell, 
   ChevronDown, 
-  ShieldCheck, 
-  Lock, 
   Sliders, 
   LogOut, 
   Sun, 
@@ -22,14 +20,12 @@ import {
   Laptop, 
   HelpCircle, 
   User, 
-  Clock, 
-  KeyRound, 
   CheckCircle2,
   ExternalLink,
   Presentation
 } from 'lucide-react';
 import { CyberLogoIcon } from './CyberLogoIcon';
-import { UserProfile, formatLoginTimestamp, getAuthMethodLabel } from '../utils/auth-store';
+import { UserProfile } from '../utils/auth-store';
 
 export type AppTheme = 'dark' | 'light' | 'system';
 
@@ -41,7 +37,7 @@ interface HeaderProps {
   theme: AppTheme;
   onThemeChange: (theme: AppTheme) => void;
   onLogout: () => void;
-  onOpenSecuritySettings: () => void;
+  onOpenSecuritySettings?: () => void;
   onOpenPitchDeck: () => void;
 }
 
@@ -53,7 +49,6 @@ export const Header: React.FC<HeaderProps> = ({
   theme,
   onThemeChange,
   onLogout,
-  onOpenSecuritySettings,
   onOpenPitchDeck,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
@@ -90,21 +85,43 @@ export const Header: React.FC<HeaderProps> = ({
   const getPageTitle = (tab: string) => {
     switch (tab) {
       case 'dashboard':
-        return { section: 'Security Operations', title: 'Live Threat Dashboard' };
+        return { section: 'MAIN', title: 'Live Threat Dashboard' };
       case 'link-scanner':
-        return { section: 'Threat Intelligence', title: 'URL & Phone Scam Scanner' };
+        return { section: 'MAIN', title: 'URL & Phone Scam Scanner' };
+      case 'phone-analysis':
+        return { section: 'MAIN', title: 'Phone Number Analysis' };
+      case 'scan-history':
+        return { section: 'MAIN', title: 'Scan History & Investigations' };
+      case 'attack-map':
+        return { section: 'THREAT INTELLIGENCE', title: 'Global Attack Map' };
+      case 'threat-heatmap':
+        return { section: 'THREAT INTELLIGENCE', title: 'Threat Density Heatmap' };
       case 'triage':
-        return { section: 'Incident Response', title: 'Threats & Triage Queue' };
+        return { section: 'THREAT INTELLIGENCE', title: 'Threats & Triage Queue' };
+      case 'threat-distribution':
+        return { section: 'THREAT INTELLIGENCE', title: 'Threat Distribution' };
+      case 'threat-trends':
+        return { section: 'THREAT INTELLIGENCE', title: 'Threat Trends & Analytics' };
+      case 'forecasting':
+        return { section: 'ADVANCED SECURITY', title: 'Predictive Threat Forecasting' };
+      case 'network-topology':
+        return { section: 'ADVANCED SECURITY', title: 'Network Health & Topology' };
+      case 'threat-feed':
+        return { section: 'ADVANCED SECURITY', title: 'Live Threat Anomaly Feed' };
       case 'vulnerabilities':
-        return { section: 'Asset Posture', title: 'Vulnerability Radar & CVEs' };
+        return { section: 'ADVANCED SECURITY', title: 'Vulnerability Radar & CVEs' };
       case 'patches':
-        return { section: 'Autonomous Defense', title: 'Patch Automation Pipeline' };
+        return { section: 'ADVANCED SECURITY', title: 'Patch Automation Pipeline' };
       case 'siem':
-        return { section: 'Telemetry Feeds', title: 'SIEM Pipeline & Ingestion' };
+        return { section: 'ADVANCED SECURITY', title: 'SIEM Pipeline & Ingestion' };
+      case 'account-settings':
+        return { section: 'SETTINGS', title: 'Account Settings & Profile' };
+      case 'security-settings':
+        return { section: 'SETTINGS', title: 'Security Settings' };
       case 'playbooks':
-        return { section: 'Orchestration', title: 'AI Incident Playbooks' };
+        return { section: 'ORCHESTRATION', title: 'AI Incident Playbooks' };
       case 'audit':
-        return { section: 'Compliance', title: 'Governance & Cryptographic Audit' };
+        return { section: 'COMPLIANCE', title: 'Governance & Cryptographic Audit' };
       default:
         return { section: 'DarkWatch AI', title: 'SOC Overview' };
     }
@@ -237,64 +254,11 @@ export const Header: React.FC<HeaderProps> = ({
                     </span>
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
                   </div>
-                  <span className="text-[11px] font-mono text-cyan-400 block truncate">
-                    {currentUser?.accountIdentifier || 'analyst@darkwatch.corp'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Status and Last Login Information */}
-              <div className="space-y-2 py-1 text-xs font-mono">
-                
-                {/* Account Status */}
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/80 border border-slate-800/80">
-                  <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                    Account Status:
-                  </span>
-                  <span className="text-[11px] font-bold text-emerald-300">
-                    Verified Zero-Trust
-                  </span>
-                </div>
-
-                {/* Actual Last Login Time */}
-                <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                      Last Login:
-                    </span>
-                    <span className="text-slate-200 font-semibold text-[10px] text-right">
-                      {formatLoginTimestamp(currentUser?.previousLogin)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Authentication Method */}
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/80 border border-slate-800/80">
-                  <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                    <KeyRound className="w-3.5 h-3.5 text-purple-400" />
-                    Auth Method:
-                  </span>
-                  <span className="text-[10px] font-bold text-purple-300 truncate max-w-[140px] text-right">
-                    {currentUser ? getAuthMethodLabel(currentUser.authMethod) : 'Passkey'}
-                  </span>
                 </div>
               </div>
 
               {/* Menu Links */}
               <div className="pt-2 border-t border-slate-800/80 space-y-1 text-xs font-medium">
-                <button
-                  onClick={() => {
-                    setIsDropdownOpen(false);
-                    onOpenSecuritySettings();
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors text-left cursor-pointer"
-                >
-                  <Lock className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Security Settings & Posture</span>
-                </button>
-
                 <button
                   onClick={() => {
                     setIsDropdownOpen(false);

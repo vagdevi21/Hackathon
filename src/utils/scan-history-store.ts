@@ -118,18 +118,29 @@ const INITIAL_SEEDED_HISTORY: ScanHistoryRecord[] = [
 ];
 
 export const getScanHistory = (): ScanHistoryRecord[] => {
-  if (typeof window === 'undefined') return INITIAL_SEEDED_HISTORY;
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_SEEDED_HISTORY));
-      return INITIAL_SEEDED_HISTORY;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_SEEDED_HISTORY;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return INITIAL_SEEDED_HISTORY;
+    return [];
   }
+};
+
+export const seedSampleScans = (): ScanHistoryRecord[] => {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_SEEDED_HISTORY));
+      window.dispatchEvent(new CustomEvent('darkwatch_history_updated', { detail: INITIAL_SEEDED_HISTORY }));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  return INITIAL_SEEDED_HISTORY;
 };
 
 export const saveScanHistoryItem = (

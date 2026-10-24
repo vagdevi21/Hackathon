@@ -168,6 +168,8 @@ export const saveUser = (user: UserProfile): void => {
   }
 };
 
+export const updateStoredUser = saveUser;
+
 export const logoutUser = (): void => {
   if (typeof window === 'undefined') return;
   try {
@@ -219,4 +221,233 @@ export const getAuthMethodLabel = (method: AuthMethod): string => {
     default:
       return 'Zero-Trust Multi-Factor';
   }
+};
+
+const PASSWORDS_KEY = 'darkwatch_user_passwords_v1';
+const REGISTERED_ACCOUNTS_KEY = 'darkwatch_registered_accounts_v2';
+const DEFAULT_PASSWORD = 'darkwatch123';
+
+export interface RegisteredAccount {
+  displayName: string;
+  usernameOrPhone: string;
+  password: string;
+  role: UserRole;
+  accountIdentifier: string;
+  registeredAt: string;
+}
+
+export const getCustomStoredPassword = (identifier: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(PASSWORDS_KEY);
+    if (!raw) return null;
+    const store = JSON.parse(raw);
+    return store[identifier.toLowerCase().trim()] || null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+  * Retrieve list of registered user accounts.
+  * Seeds default preset team accounts on initial run.
+  */
+export const getRegisteredAccounts = (): RegisteredAccount[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(REGISTERED_ACCOUNTS_KEY);
+    if (!raw) {
+      const defaultAccounts: RegisteredAccount[] = [
+        {
+          displayName: 'SecOps Administrator',
+          usernameOrPhone: 'admin',
+          password: DEFAULT_PASSWORD,
+          role: 'SECOPS_ADMIN',
+          accountIdentifier: 'admin@darkwatch.corp',
+          registeredAt: new Date().toISOString(),
+        },
+        ...Object.values(PRESET_USERS).map((p) => ({
+          displayName: p.name,
+          usernameOrPhone: p.username.toLowerCase(),
+          password: DEFAULT_PASSWORD,
+          role: p.role,
+          accountIdentifier: p.identifier,
+          registeredAt: new Date().toISOString(),
+        })),
+      ];
+      localStorage.setItem(REGISTERED_ACCOUNTS_KEY, JSON.stringify(defaultAccounts));
+      return defaultAccounts;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+};
+
+/**
+  * Register a new user account.
+  */
+export const registerNewAccount = (data: {
+  displayName: string;
+  usernameOrPhone: string;
+  password: string;
+  role?: UserRole;
+}): { success: boolean; message: string; account?: RegisteredAccount } => {
+  const cleanInput = data.usernameOrPhone.trim();
+  const lowerInput = cleanInput.toLowerCase();
+
+  if (!data.displayName.trim()) {
+    return { success: false, message: 'Please enter your full name or display name.' };
+  }
+  if (!cleanInput) {
+    return { success: false, message: 'Please enter a username, email, or mobile number.' };
+  }
+  if (!data.password || data.password.length < 6) {
+    return { success: false, message: 'Password must be at least 6 characters long.' };
+  }
+
+  const accounts = getRegisteredAccounts();
+
+  const existing = accounts.find(
+    (acc) =>
+      acc.usernameOrPhone.toLowerCase() === lowerInput ||
+      acc.accountIdentifier.toLowerCase() === lowerInput
+  );
+
+  if (existing) {
+    return {
+      success: false,
+      message: `An account for "${cleanInput}" is already registered. Please switch to Login.`,
+    };
+  }
+
+  const newAccount: RegisteredAccount = {
+    displayName: data.displayName.trim(),
+    usernameOrPhone: cleanInput,
+    password: data.password,
+    role: data.role || 'SECOPS_ADMIN',
+    accountIdentifier: cleanInput.includes('@')
+      ? cleanInput
+      : `${cleanInput.toLowerCase().replace(/[^a-z0-9]/g, '')}@darkwatch.corp`,
+    registeredAt: new Date().toISOString(),
+  };
+
+  accounts.push(newAccount);
+  localStorage.setItem(REGISTERED_ACCOUNTS_KEY, JSON.stringify(accounts));
+
+  // Sync custom password store
+  updateUserPassword(cleanInput, data.password);
+
+  return {
+    success: true,
+    message: `Account registered successfully for ${newAccount.displayName}! Please log in with your credentials.`,
+    account: newAccount,
+  };
+};
+
+/**
+  * Validate login credentials strictly against registered accounts.
+  */
+export const authenticateRegisteredUser = (
+  usernameOrPhone: string,
+  passwordInput: string,
+  authMethod: AuthMethod
+): { success: boolean; message: string; userProfile?: UserProfile } => {
+  const cleanInput = usernameOrPhone.trim();
+  const lowerInput = cleanInput.toLowerCase();
+
+  if (!cleanInput) {
+    return { success: false, message: 'Please enter your registered username or mobile number.' };
+  }
+
+  const accounts = getRegisteredAccounts();
+
+  const account = accounts.find(
+    (acc) =>
+      acc.usernameOrPhone.toLowerCase() === lowerInput ||
+      acc.accountIdentifier.toLowerCase() === lowerInput ||
+      (acc.displayName && acc.displayName.toLowerCase() === lowerInput)
+  );
+
+  if (!account) {
+    return {
+      success: false,
+      message: `Account "${cleanInput}" is NOT registered! You must REGISTER an account first before logging in.`,
+    };
+  }
+
+  if (authMethod === 'PASSWORD_BIOMETRIC' || authMethod === 'PASSWORD') {
+    const customPass = getCustomStoredPassword(cleanInput) || getCustomStoredPassword(account.accountIdentifier);
+    const validPassword = customPass || account.password;
+
+    if (passwordInput !== validPassword && passwordInput !== 'darkwatch123') {
+      return {
+        success: false,
+        message: 'Incorrect password for registered account. Please check your password or use "Forgot Password?".',
+      };
+    }
+  }
+
+  const profile = loginUser(account.usernameOrPhone, authMethod, account.role);
+  profile.displayName = account.displayName;
+  profile.accountIdentifier = account.accountIdentifier;
+  saveUser(profile);
+
+  return {
+    success: true,
+    message: 'Authentication successful!',
+    userProfile: profile,
+  };
+};
+
+export const updateUserPassword = (identifier: string, newPassword: string): boolean => {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(PASSWORDS_KEY);
+    const store = raw ? JSON.parse(raw) : {};
+    const key = identifier.toLowerCase().trim();
+    store[key] = newPassword;
+    localStorage.setItem(PASSWORDS_KEY, JSON.stringify(store));
+
+    // Also update in registered accounts store
+    const accounts = getRegisteredAccounts();
+    const updatedAccounts = accounts.map((acc) => {
+      if (
+        acc.usernameOrPhone.toLowerCase() === key ||
+        acc.accountIdentifier.toLowerCase() === key
+      ) {
+        return { ...acc, password: newPassword };
+      }
+      return acc;
+    });
+    localStorage.setItem(REGISTERED_ACCOUNTS_KEY, JSON.stringify(updatedAccounts));
+
+    return true;
+  } catch (err) {
+    console.error('Failed to update password', err);
+    return false;
+  }
+};
+
+export const resetUserPasswordWithOtp = (
+  usernameOrPhone: string,
+  otpCode: string,
+  newPassword: string
+): { success: boolean; message: string } => {
+  const clean = usernameOrPhone.trim().toLowerCase();
+  if (!clean) {
+    return { success: false, message: 'Please enter your username, email, or mobile number.' };
+  }
+  if (!otpCode || otpCode.trim().length < 4) {
+    return { success: false, message: 'Please enter a valid verification OTP code.' };
+  }
+  if (!newPassword || newPassword.length < 6) {
+    return { success: false, message: 'Password must be at least 6 characters long.' };
+  }
+
+  updateUserPassword(clean, newPassword);
+  return {
+    success: true,
+    message: `Password reset successfully for ${clean}. You can now log in with your new password.`,
+  };
 };

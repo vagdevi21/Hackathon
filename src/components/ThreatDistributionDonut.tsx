@@ -1,29 +1,88 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
- * DarkWatch AI - Threat Distribution Donut (Slide 08)
+ * DarkWatch AI - Threat Distribution Donut
+ * Derived dynamically from verified findings or displays honest empty state when no data exists.
  */
 
 import React, { useState } from 'react';
-import { PieChart, ShieldCheck } from 'lucide-react';
+import { PieChart, ShieldCheck, AlertCircle } from 'lucide-react';
+import { ThreatCategoryDistribution } from '../services/link-analyzer';
+import { getScanHistory } from '../utils/scan-history-store';
 
-interface Slice {
-  name: string;
-  percent: number;
-  color: string;
-  accent: string;
-  count: number;
+interface ThreatDistributionDonutProps {
+  customDistribution?: ThreatCategoryDistribution[];
+  emptyMessage?: string;
 }
 
-export const ThreatDistributionDonut: React.FC = () => {
-  const slices: Slice[] = [
-    { name: 'Malware', percent: 48, color: '#a855f7', accent: '#c084fc', count: 48 },
-    { name: 'Phishing', percent: 27, color: '#06b6d4', accent: '#22d3ee', count: 27 },
-    { name: 'Suspicious', percent: 15, color: '#10b981', accent: '#34d399', count: 15 },
-    { name: 'Others', percent: 10, color: '#f59e0b', accent: '#fbbf24', count: 10 },
-  ];
+export const ThreatDistributionDonut: React.FC<ThreatDistributionDonutProps> = ({
+  customDistribution,
+  emptyMessage = 'Insufficient evidence to calculate threat distribution. Run a scan to generate verified distribution telemetry.',
+}) => {
+  // If custom distribution passed, use it; otherwise compute from actual scan history
+  const [historyItems] = useState(() => getScanHistory());
 
-  const [activeSlice, setActiveSlice] = useState<Slice>(slices[0]);
+  let items: ThreatCategoryDistribution[] = [];
+
+  if (customDistribution && customDistribution.length > 0) {
+    items = customDistribution;
+  } else if (historyItems.length > 0) {
+    // Dynamically categorize scan history
+    const counts: Record<string, number> = {
+      Phishing: 0,
+      Malware: 0,
+      'VoIP Fraud / Impersonation': 0,
+      'Suspicious Domain': 0,
+    };
+    let total = 0;
+
+    for (const h of historyItems) {
+      if (h.scamRating > 30) {
+        total++;
+        const cat = (h.category || '').toLowerCase();
+        if (cat.includes('phish') || cat.includes('credential')) counts.Phishing++;
+        else if (cat.includes('malware') || cat.includes('apk') || cat.includes('drainer')) counts.Malware++;
+        else if (cat.includes('voip') || cat.includes('irs') || cat.includes('impersonat')) counts['VoIP Fraud / Impersonation']++;
+        else counts['Suspicious Domain']++;
+      }
+    }
+
+    if (total > 0) {
+      const colors = ['#06b6d4', '#a855f7', '#f59e0b', '#ec4899'];
+      let colorIdx = 0;
+      items = Object.entries(counts)
+        .filter(([_, c]) => c > 0)
+        .map(([name, count]) => {
+          const color = colors[colorIdx++ % colors.length];
+          return {
+            name,
+            percentage: Math.round((count / total) * 100),
+            count,
+            color,
+            description: `${count} verified detections`,
+          };
+        });
+    }
+  }
+
+  const [activeItem, setActiveItem] = useState<ThreatCategoryDistribution | null>(items[0] || null);
+
+  if (items.length === 0) {
+    return (
+      <div className="cyber-card rounded-2xl p-5 border border-purple-900/40 relative overflow-hidden flex flex-col justify-center items-center text-center min-h-[260px]">
+        <div className="p-3 rounded-full bg-slate-900 border border-slate-800 text-slate-500 mb-3">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h3 className="text-sm font-bold text-white mb-1">Threat Distribution</h3>
+        <p className="text-xs text-slate-400 max-w-sm leading-relaxed mb-3">
+          {emptyMessage}
+        </p>
+        <span className="text-[10px] font-mono text-purple-400 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800/40">
+          AWAITING SCAN TELEMETRY
+        </span>
+      </div>
+    );
+  }
 
   // SVG Donut calculation
   const size = 180;
@@ -43,16 +102,16 @@ export const ThreatDistributionDonut: React.FC = () => {
           </div>
           <div>
             <h3 className="text-sm font-bold text-white tracking-wide">Threat Distribution</h3>
-            <p className="text-[11px] text-slate-400">Classified payload taxonomy</p>
+            <p className="text-[11px] text-slate-400">Derived from verified findings</p>
           </div>
         </div>
         <span className="text-xs font-mono font-bold text-purple-400 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800/40">
-          100% Normalized
+          Dynamic Telemetry
         </span>
       </div>
 
       {/* Donut & Stats container */}
-      <div className="flex items-center justify-between gap-4 py-2">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-2">
         {/* SVG Donut */}
         <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
           <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="transform -rotate-90">
@@ -61,17 +120,14 @@ export const ThreatDistributionDonut: React.FC = () => {
               cx={size / 2}
               cy={size / 2}
               r={radius}
-              fill="none"
+              fill="transparent"
               stroke="#0f172a"
               strokeWidth={strokeWidth}
             />
-
-            {/* Slices */}
-            {slices.map((slice) => {
-              const strokeDasharray = `${(slice.percent / 100) * circumference} ${circumference}`;
-              const strokeDashoffset = -((accumulatedPercent / 100) * circumference);
-              accumulatedPercent += slice.percent;
-              const isSelected = activeSlice.name === slice.name;
+            {items.map((slice) => {
+              const strokeDashoffset = circumference - (circumference * slice.percentage) / 100;
+              const rotation = (accumulatedPercent / 100) * 360;
+              accumulatedPercent += slice.percentage;
 
               return (
                 <circle
@@ -79,61 +135,58 @@ export const ThreatDistributionDonut: React.FC = () => {
                   cx={size / 2}
                   cy={size / 2}
                   r={radius}
-                  fill="none"
+                  fill="transparent"
                   stroke={slice.color}
-                  strokeWidth={isSelected ? strokeWidth + 4 : strokeWidth}
-                  strokeDasharray={strokeDasharray}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={circumference}
                   strokeDashoffset={strokeDashoffset}
-                  className="transition-all duration-300 cursor-pointer hover:opacity-90"
-                  onMouseEnter={() => setActiveSlice(slice)}
+                  style={{
+                    transformOrigin: 'center',
+                    transform: `rotate(${rotation}deg)`,
+                    transition: 'stroke-width 0.2s ease, opacity 0.2s ease',
+                  }}
+                  className="cursor-pointer hover:opacity-90"
+                  onMouseEnter={() => setActiveItem(slice)}
                 />
               );
             })}
           </svg>
 
-          {/* Center Callout */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-            <span
-              className="text-2xl font-black font-mono tracking-tight"
-              style={{ color: activeSlice.color }}
-            >
-              {activeSlice.percent}%
+          {/* Center text */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+            <span className="text-2xl font-black font-mono text-white">
+              {activeItem ? `${activeItem.percentage}%` : '100%'}
             </span>
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-300">
-              {activeSlice.name}
+            <span className="text-[10px] font-mono text-cyan-300 font-bold uppercase truncate max-w-[90px]">
+              {activeItem ? activeItem.name : 'Findings'}
             </span>
           </div>
         </div>
 
-        {/* Legend list */}
-        <div className="flex-1 space-y-2">
-          {slices.map((slice) => {
-            const isSelected = activeSlice.name === slice.name;
+        {/* Legend / Breakdown list */}
+        <div className="flex-1 space-y-2 w-full">
+          {items.map((slice) => {
+            const isSelected = activeItem?.name === slice.name;
             return (
               <div
                 key={slice.name}
-                onMouseEnter={() => setActiveSlice(slice)}
-                className={`flex items-center justify-between p-1.5 rounded-lg transition-all cursor-pointer ${
+                onMouseEnter={() => setActiveItem(slice)}
+                className={`p-2 rounded-xl transition-all cursor-pointer border ${
                   isSelected
-                    ? 'bg-slate-800/80 border border-slate-700 shadow-sm'
-                    : 'hover:bg-slate-900/60 border border-transparent'
+                    ? 'bg-slate-800/80 border-slate-700 shadow-sm'
+                    : 'bg-slate-900/40 border-transparent hover:bg-slate-800/40'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: slice.color, boxShadow: `0 0 8px ${slice.color}88` }}
-                  />
-                  <span className={`text-xs font-semibold ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                    {slice.name}
-                  </span>
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: slice.color }} />
+                    <span className="font-semibold text-slate-200 truncate">{slice.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 font-mono text-[11px]">
+                    <span className="text-slate-400">({slice.count})</span>
+                    <span className="font-bold text-white">{slice.percentage}%</span>
+                  </div>
                 </div>
-                <span
-                  className="text-xs font-mono font-bold"
-                  style={{ color: slice.color }}
-                >
-                  {slice.percent}%
-                </span>
               </div>
             );
           })}

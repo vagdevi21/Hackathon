@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 
 @layer base {
   :root {
@@ -17,7 +18,7 @@
   body {
     background-color: #050814;
     color: #e2e8f0;
-    font-family: 'Plus Jakarta Sans', 'Noto Sans Telugu', system-ui, -apple-system, sans-serif;
+    font-family: 'Outfit', 'Plus Jakarta Sans', 'Noto Sans Telugu', system-ui, -apple-system, sans-serif;
     overflow-x: hidden;
     transition: background-color 0.25s ease, color 0.25s ease;
   }
@@ -44,6 +45,7 @@ body.light .cyber-card {
   background: #ffffff !important;
   border: 1px solid #cbd5e1 !important;
   box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08) !important;
+  color: #0f172a !important;
 }
 
 body.light .cyber-card:hover {
@@ -68,6 +70,18 @@ body.light footer > div:first-child {
   color: #1e293b !important;
 }
 
+/* Gradient card overrides */
+body.light [class*="from-[#060b20]"],
+body.light [class*="from-[#040714]"],
+body.light [class*="from-[#080d24]"],
+body.light [class*="from-[#050814]"],
+body.light [class*="from-[#060a1c]"],
+body.light [class*="from-[#090d26]"] {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%) !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
 /* Text color adaptations */
 body.light .text-white {
   color: #0f172a !important;
@@ -90,48 +104,75 @@ body.light .text-slate-500 {
   color: #64748b !important;
 }
 
+/* Icon & Accent colors in Light Mode */
+body.light .text-cyan-400 { color: #0284c7 !important; }
+body.light .text-cyan-300 { color: #0369a1 !important; }
+body.light .text-purple-400 { color: #7c3aed !important; }
+body.light .text-purple-300 { color: #6d28d9 !important; }
+body.light .text-emerald-400 { color: #059669 !important; }
+body.light .text-emerald-300 { color: #047857 !important; }
+body.light .text-amber-400 { color: #d97706 !important; }
+body.light .text-amber-300 { color: #b45309 !important; }
+body.light .text-red-400,
+body.light .text-rose-400 { color: #dc2626 !important; }
+
 /* Input, select and button adaptations */
 body.light input,
 body.light select,
 body.light textarea {
   color: #0f172a !important;
   background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
 }
 
 body.light input::placeholder {
   color: #64748b !important;
 }
 
-/* Surface backgrounds */
-body.light .bg-slate-950,
-body.light .bg-slate-950\/90,
-body.light .bg-slate-950\/80,
-body.light .bg-slate-950\/60,
-body.light .bg-slate-950\/40 {
+/* Disabled button state in Light Mode */
+body.light button:disabled,
+body.light [disabled] {
+  background: #e2e8f0 !important;
+  color: #64748b !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  cursor: not-allowed !important;
+}
+
+body.light button:disabled *,
+body.light [disabled] * {
+  color: #64748b !important;
+}
+
+/* Surface backgrounds for slate opacity variants */
+body.light [class*="bg-slate-950"] {
   background-color: #ffffff !important;
   border-color: #cbd5e1 !important;
-}
-
-body.light .bg-slate-900,
-body.light .bg-slate-900\/90,
-body.light .bg-slate-900\/80,
-body.light .bg-slate-900\/70,
-body.light .bg-slate-900\/60 {
-  background-color: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
-}
-
-body.light .bg-slate-800,
-body.light .bg-slate-800\/80 {
-  background-color: #e2e8f0 !important;
   color: #0f172a !important;
 }
 
-body.light .border-slate-800,
-body.light .border-slate-800\/80,
-body.light .border-slate-800\/60,
-body.light .border-slate-900 {
+body.light [class*="bg-slate-900"] {
+  background-color: #f1f5f9 !important;
   border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+body.light [class*="bg-slate-800"] {
+  background-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Modal backgrounds */
+body.light .bg-\[\#080d24\],
+body.light .bg-\[\#090e24\],
+body.light .bg-\[\#060a1c\],
+body.light .bg-\[\#040714\],
+body.light .bg-\[\#090d26\] {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
 }
 
 /* Pill & Badge high contrast overrides */
@@ -163,13 +204,17 @@ body.light .bg-indigo-600\/30 {
   color: #3730a3 !important;
 }
 
-body.light .bg-emerald-950\/60 {
+body.light .bg-emerald-950,
+body.light .bg-emerald-950\/60,
+body.light .bg-emerald-950\/80 {
   background-color: #dcfce7 !important;
   border-color: #86efac !important;
   color: #15803d !important;
 }
 
-body.light .bg-amber-950\/60 {
+body.light .bg-amber-950,
+body.light .bg-amber-950\/60,
+body.light .bg-amber-950\/80 {
   background-color: #fef3c7 !important;
   border-color: #fcd34d !important;
   color: #b45309 !important;

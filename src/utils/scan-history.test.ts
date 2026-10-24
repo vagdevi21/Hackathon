@@ -6,14 +6,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { getScanHistory, saveScanHistoryItem, deleteScanHistoryItem } from './scan-history-store.ts';
+import { getScanHistory, saveScanHistoryItem, deleteScanHistoryItem, seedSampleScans } from './scan-history-store.ts';
 
-test('getScanHistory returns non-empty seeded list by default', () => {
+test('getScanHistory returns clean list when unseeded and supports seedSampleScans', () => {
   const history = getScanHistory();
   assert.ok(Array.isArray(history));
-  assert.ok(history.length >= 4, 'Should contain pre-seeded realistic threat telemetry');
-  assert.ok(history.some(x => x.targetType === 'URL'));
-  assert.ok(history.some(x => x.targetType === 'PHONE'));
+  const seeded = seedSampleScans();
+  assert.ok(seeded.length >= 4, 'Should contain realistic threat telemetry when sample data is loaded');
+  assert.ok(seeded.some(x => x.targetType === 'URL'));
+  assert.ok(seeded.some(x => x.targetType === 'PHONE'));
 });
 
 test('saveScanHistoryItem prepends new record with generated ID and timestamp', () => {
