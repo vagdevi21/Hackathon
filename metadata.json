@@ -1,0 +1,7 @@
+{
+  "name": "DarkWatch AI - Cyber Threat Early Warning & Vulnerability Response",
+  "description": "AI-Powered real-time cyber threat detection, vulnerability assessment, automated patch management, and human-in-the-loop incident response system by Team SYNORA.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
