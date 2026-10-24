@@ -490,3 +490,13 @@ body.light .cyber-grid {
 .animate-emblem-pulse {
   animation: emblem-cyber-pulse 2.8s ease-in-out infinite;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-emblem-sweep,
+  .animate-emblem-pulse,
+  .animate-radar-sweep,
+  .animate-pulse-glow,
+  .animate-spin-slow {
+    animation: none !important;
+  }
+}

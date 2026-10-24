@@ -152,7 +152,6 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="hidden sm:block text-left">
             <span className="text-base font-serif font-extrabold tracking-tight flex items-center leading-none">
               <span className="brand-name">DarkWatch</span>
-              <span className="ai-label">AI</span>
             </span>
           </div>
         </div>

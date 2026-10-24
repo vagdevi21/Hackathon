@@ -337,7 +337,7 @@ export default function App() {
         {/* Tab Content Views */}
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
           {activeTab !== 'dashboard' && (
-            <div className="sticky top-[65px] z-30 p-3 bg-[#050814]/95 dark:bg-[#050814]/95 light:bg-white/95 backdrop-blur-md border border-cyan-500/40 rounded-2xl flex items-center justify-between shadow-xl mb-4 transition-all">
+            <div className="relative p-3 bg-[#050814]/95 dark:bg-[#050814]/95 light:bg-white/95 backdrop-blur-md border border-cyan-500/40 rounded-2xl flex items-center justify-between shadow-xl mb-4 transition-all">
               <button
                 onClick={() => setActiveTab('dashboard')}
                 className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/50 text-xs font-mono font-bold transition-all cursor-pointer shadow-glow-cyan active:scale-95"
