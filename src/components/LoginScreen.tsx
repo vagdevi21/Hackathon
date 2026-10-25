@@ -111,13 +111,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const handleSendResetOtp = () => {
     if (!resetIdentifier.trim()) {
       setResetErrorMsg('Please enter your username, email, or mobile number.');
-      cyberAudio.playWarning();
       return;
     }
+    const dynamicOtp = Math.floor(100000 + Math.random() * 900000).toString();
     setResetErrorMsg(null);
     setResetOtpSent(true);
-    setResetOtpCode('892104');
-    setResetSuccessMsg(`Verification OTP code dispatched to ${resetIdentifier.trim()}. Demo OTP: 892104`);
+    setResetOtpCode(dynamicOtp);
+    setResetSuccessMsg(`Secure 6-Digit Verification OTP dispatched to ${resetIdentifier.trim()}. Demo OTP: ${dynamicOtp}`);
     cyberAudio.playClick();
   };
 
@@ -127,7 +127,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     if (resetNewPassword !== resetConfirmPassword) {
       setResetErrorMsg('New password and confirmation password do not match.');
-      cyberAudio.playWarning();
       return;
     }
 
@@ -147,7 +146,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       cyberAudio.playSuccess();
     } else {
       setResetErrorMsg(res.message);
-      cyberAudio.playWarning();
     }
   };
 
@@ -382,7 +380,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
       if (!authRes.success || !authRes.userProfile) {
         setErrorMsg(authRes.message);
-        cyberAudio.playWarning();
         return;
       }
 
@@ -480,9 +477,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 {screenMode === 'LOGIN' ? (
                   <form onSubmit={handleAuthenticate} className="space-y-5">
                     {/* Notice Banner */}
-                    <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-[11px] font-mono text-cyan-300 flex items-center gap-2">
+                    <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-[11px] text-cyan-300 flex items-center gap-2">
                       <Info className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                      <span>Strict Account Security: First-time users must Register an account before logging in.</span>
+                      <span className="font-serif">Strict Account Security: First-time users must Register an account before logging in.</span>
                     </div>
 
                     {/* Username or Mobile Number Input (Placed First) */}

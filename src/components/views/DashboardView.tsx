@@ -119,6 +119,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
+      {/* Mobile version only: Page title span moved above Intelligent Security Analysis */}
+      <div className="sm:hidden text-xs font-mono text-cyan-300 font-bold tracking-wide">
+        Live Threat Dashboard
+      </div>
+
       {/* 2. Prominent Security Analysis Card */}
       <div className="cyber-card rounded-2xl p-6 border border-cyan-500/30 space-y-5 shadow-2xl bg-gradient-to-br from-[#060b20] via-slate-900/90 to-[#0c0824]">
         <div className="flex flex-wrap items-center justify-between gap-3">

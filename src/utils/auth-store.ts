@@ -393,8 +393,9 @@ export const registerNewAccount = (data: {
   if (!cleanInput) {
     return { success: false, message: 'Please enter a username, email, or mobile number.' };
   }
-  if (!data.password || data.password.length < 6) {
-    return { success: false, message: 'Password must be at least 6 characters long.' };
+  const passwordCheck = validatePasswordStrength(data.password);
+  if (!passwordCheck.valid) {
+    return { success: false, message: passwordCheck.message };
   }
 
   const accounts = getRegisteredAccounts();
@@ -564,6 +565,22 @@ export const updateUserPassword = (identifier: string, newPassword: string): boo
   }
 };
 
+export const validatePasswordStrength = (pwd: string): { valid: boolean; message: string } => {
+  if (!pwd || pwd.length < 8) {
+    return { valid: false, message: 'Password must be at least 8 characters long.' };
+  }
+  if (!/[A-Za-z]/.test(pwd)) {
+    return { valid: false, message: 'Password must contain at least one letter.' };
+  }
+  if (!/\d/.test(pwd)) {
+    return { valid: false, message: 'Password must contain at least one number.' };
+  }
+  if (!/[-@#$!%*?&]/.test(pwd)) {
+    return { valid: false, message: 'Password must contain at least one special character (e.g. -, @, #, $).' };
+  }
+  return { valid: true, message: '' };
+};
+
 export const resetUserPasswordWithOtp = (
   usernameOrPhone: string,
   otpCode: string,
@@ -576,8 +593,9 @@ export const resetUserPasswordWithOtp = (
   if (!otpCode || otpCode.trim().length < 4) {
     return { success: false, message: 'Please enter a valid verification OTP code.' };
   }
-  if (!newPassword || newPassword.length < 6) {
-    return { success: false, message: 'Password must be at least 6 characters long.' };
+  const passwordCheck = validatePasswordStrength(newPassword);
+  if (!passwordCheck.valid) {
+    return { success: false, message: passwordCheck.message };
   }
 
   updateUserPassword(clean, newPassword);

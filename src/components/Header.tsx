@@ -148,9 +148,9 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <div className="flex items-center gap-2">
-          <CyberLogoIcon size={30} className="hidden sm:inline-flex" />
-          <div className="hidden sm:block text-left">
-            <span className="text-base font-serif font-extrabold tracking-tight flex items-center leading-none">
+          <CyberLogoIcon size={30} />
+          <div className="text-left">
+            <span className="text-sm sm:text-base font-serif font-extrabold tracking-tight flex items-center leading-none">
               <span className="brand-name">DarkWatch</span>
               <span className="ai-label">AI</span>
             </span>
@@ -158,14 +158,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Center Area: Elegant Breadcrumb & Page Title */}
-      <div className="flex items-center gap-2 text-xs font-mono">
-        <span className="text-slate-500 hidden md:inline">{pageMeta.section}</span>
-        <span className="text-slate-600 hidden md:inline">/</span>
-        <span className="text-cyan-300 font-bold tracking-wide truncate max-w-[200px] sm:max-w-md">
-          {pageMeta.title}
-        </span>
-      </div>
+
 
       {/* Right Area: Notification Bell & Small Circular User Avatar */}
       <div className="flex items-center gap-3">
