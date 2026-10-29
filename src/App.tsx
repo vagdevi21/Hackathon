@@ -17,6 +17,7 @@ import { SiemPipelineView } from './components/views/SiemPipelineView';
 import { AiPlaybooksView } from './components/views/AiPlaybooksView';
 import { GovernanceAuditView } from './components/views/GovernanceAuditView';
 import { LinkRiskScannerView } from './components/views/LinkRiskScannerView';
+import { AuthenticityVerificationView } from './components/views/AuthenticityVerificationView';
 import { AttackMapView } from './components/views/AttackMapView';
 import { ThreatHeatmapView } from './components/views/ThreatHeatmapView';
 import { ThreatTrendsView } from './components/views/ThreatTrendsView';
@@ -367,6 +368,13 @@ export default function App() {
                 setActiveTab(tab);
               }}
               onOpenHistory={() => setActiveTab('scan-history')}
+              currentUser={currentUser}
+            />
+          )}
+
+          {activeTab === 'authenticity-verification' && (
+            <AuthenticityVerificationView 
+              onBackToDashboard={() => setActiveTab('dashboard')}
               currentUser={currentUser}
             />
           )}

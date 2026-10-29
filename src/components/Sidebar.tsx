@@ -19,6 +19,7 @@ import {
   Globe, 
   Flame, 
   ShieldAlert, 
+  ShieldCheck,
   PieChart, 
   BarChart3, 
   TrendingUp, 
@@ -102,6 +103,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'MAIN',
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: Layers },
+        { id: 'authenticity-verification', label: 'Authenticity & Threat Verification', icon: ShieldCheck },
         { id: 'link-scanner', label: 'URL & Phone Scam Scanner', icon: Link2 },
         { id: 'phone-analysis', label: 'Phone Number Analysis', icon: Phone },
         { id: 'scan-history', label: 'Scan History', icon: History },

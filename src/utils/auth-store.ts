@@ -633,11 +633,24 @@ export const setStoredToken = (token: string | null): void => {
 
 export async function apiRegisterAccount(data: {
   username: string;
-  email: string;
-  displayName: string;
+  mobileNumber: string;
+  phoneNumber?: string;
+  email?: string;
+  displayName?: string;
   password: string;
   confirmPassword: string;
-}): Promise<{ success: boolean; message: string; requiresVerification?: boolean; devHint?: string }> {
+}): Promise<{ 
+  success: boolean; 
+  message: string; 
+  requiresVerification?: boolean; 
+  mobileMasked?: string; 
+  cooldownSeconds?: number;
+  deliveryState?: string;
+  isConfigured?: boolean;
+  provider?: string;
+  devHint?: string;
+  devOtpCode?: string;
+}> {
   try {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
@@ -646,34 +659,83 @@ export async function apiRegisterAccount(data: {
     });
     const result = await res.json();
     if (!res.ok) {
-      return { success: false, message: result.error || 'Registration failed.' };
+      return { 
+        success: false, 
+        message: result.error || 'Registration failed.',
+        deliveryState: result.deliveryState,
+        provider: result.provider,
+      };
     }
     return {
       success: true,
       message: result.message,
       requiresVerification: result.requiresVerification,
+      mobileMasked: result.mobileMasked,
+      cooldownSeconds: result.cooldownSeconds,
+      deliveryState: result.deliveryState,
+      isConfigured: result.isConfigured,
+      provider: result.provider,
       devHint: result.devHint,
+      devOtpCode: result.devOtpCode,
     };
   } catch (err: any) {
-    // Fallback to local client store if offline
-    const local = registerNewAccount({
-      displayName: data.displayName,
-      usernameOrPhone: data.username,
-      password: data.password,
+    return { success: false, message: 'Registration service unreachable. Please verify network connectivity.' };
+  }
+}
+
+export async function apiResendRegistrationOtp(
+  usernameOrPhone: string
+): Promise<{ 
+  success: boolean; 
+  message: string; 
+  cooldownSeconds?: number; 
+  mobileMasked?: string; 
+  deliveryState?: string;
+  isConfigured?: boolean;
+  provider?: string;
+  devHint?: string; 
+  devOtpCode?: string;
+}> {
+  try {
+    const res = await fetch('/api/auth/resend-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: usernameOrPhone, mobileNumber: usernameOrPhone }),
     });
-    return { success: local.success, message: local.message };
+    const result = await res.json();
+    if (!res.ok) {
+      return { 
+        success: false, 
+        message: result.error || 'Failed to resend code.',
+        deliveryState: result.deliveryState,
+        provider: result.provider,
+      };
+    }
+    return {
+      success: true,
+      message: result.message,
+      cooldownSeconds: result.cooldownSeconds,
+      mobileMasked: result.mobileMasked,
+      deliveryState: result.deliveryState,
+      isConfigured: result.isConfigured,
+      provider: result.provider,
+      devHint: result.devHint,
+      devOtpCode: result.devOtpCode,
+    };
+  } catch (err: any) {
+    return { success: false, message: 'Network error communicating with verification service.' };
   }
 }
 
 export async function apiVerifyRegistrationOtp(
-  username: string,
+  usernameOrPhone: string,
   otpCode: string
 ): Promise<{ success: boolean; message: string; user?: UserProfile; token?: string }> {
   try {
     const res = await fetch('/api/auth/verify-registration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, otpCode }),
+      body: JSON.stringify({ username: usernameOrPhone, mobileNumber: usernameOrPhone, otpCode }),
     });
     const result = await res.json();
     if (!res.ok) {
@@ -687,12 +749,13 @@ export async function apiVerifyRegistrationOtp(
         id: result.user.id,
         username: result.user.username,
         displayName: result.user.displayName,
-        accountIdentifier: result.user.email,
+        accountIdentifier: result.user.phoneNumber || result.user.email || result.user.username,
         role: result.user.role,
         authMethod: 'PASSWORD_BIOMETRIC',
         currentLogin: result.user.currentLogin,
         previousLogin: result.user.previousLogin,
         isVerified: true,
+        phoneNumber: result.user.phoneNumber,
       };
       saveUser(profile);
       return { success: true, message: result.message, user: profile, token: result.token };
@@ -726,12 +789,13 @@ export async function apiLogin(
         id: result.user.id,
         username: result.user.username,
         displayName: result.user.displayName,
-        accountIdentifier: result.user.email,
+        accountIdentifier: result.user.phoneNumber || result.user.email || result.user.username,
         role: result.user.role,
         authMethod,
         currentLogin: result.user.currentLogin,
         previousLogin: result.user.previousLogin,
         isVerified: result.user.isVerified,
+        phoneNumber: result.user.phoneNumber,
       };
       saveUser(profile);
       return { success: true, message: result.message, userProfile: profile, token: result.token };
@@ -740,6 +804,70 @@ export async function apiLogin(
   } catch (err) {
     // Offline local fallback
     return authenticateRegisteredUser(identifier, password, authMethod);
+  }
+}
+
+export async function apiSendLoginOtp(
+  identifier: string
+): Promise<{ success: boolean; message: string; cooldownSeconds?: number; mobileMasked?: string; devHint?: string }> {
+  try {
+    const res = await fetch('/api/auth/send-login-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      return { success: false, message: result.error || 'Failed to dispatch login OTP.' };
+    }
+    return {
+      success: true,
+      message: result.message,
+      cooldownSeconds: result.cooldownSeconds,
+      mobileMasked: result.mobileMasked,
+      devHint: result.devHint,
+    };
+  } catch {
+    return { success: false, message: 'Network communication failure requesting SMS OTP.' };
+  }
+}
+
+export async function apiVerifyLoginOtp(
+  identifier: string,
+  otpCode: string
+): Promise<{ success: boolean; message: string; userProfile?: UserProfile; token?: string }> {
+  try {
+    const res = await fetch('/api/auth/verify-login-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, otpCode }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      return { success: false, message: result.error || 'OTP verification failed.' };
+    }
+    if (result.token) {
+      setStoredToken(result.token);
+    }
+    if (result.user) {
+      const profile: UserProfile = {
+        id: result.user.id,
+        username: result.user.username,
+        displayName: result.user.displayName,
+        accountIdentifier: result.user.phoneNumber || result.user.email || result.user.username,
+        role: result.user.role,
+        authMethod: 'MOBILE_OTP',
+        currentLogin: result.user.currentLogin,
+        previousLogin: result.user.previousLogin,
+        isVerified: true,
+        phoneNumber: result.user.phoneNumber,
+      };
+      saveUser(profile);
+      return { success: true, message: result.message, userProfile: profile, token: result.token };
+    }
+    return { success: true, message: result.message };
+  } catch {
+    return { success: false, message: 'Authentication service unavailable.' };
   }
 }
 

@@ -103,6 +103,14 @@ Executes all unit and integration tests across security algorithms, link risk sc
 | `/api/audit/verify` | `GET` | Validate entire SHA-256 hash chain integrity |
 | `/api/ai/analyze-threat` | `POST` | Server-side Gemini 2.5 Flash threat reasoning |
 
+### Authenticity, Scam & Threat Verification Center
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/verification/phone` | `POST` | Validates format (+91 first), E.164 normalization, suspicious patterns, caller reputation |
+| `/api/verification/url` | `POST` | Syntax checks, strict SSRF loopback/cloud metadata protection, lookalike & punycode analysis |
+| `/api/verification/document` | `POST` | PDF/PNG/JPG inspection, SHA-256 fingerprinting, mock/sample exam recognition, authoritative matching |
+| `/api/verification/providers` | `GET` | Provider transparency status (configured vs unconfigured honest fallbacks) |
+
 ---
 
 ## License

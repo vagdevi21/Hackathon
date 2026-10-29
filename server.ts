@@ -15,9 +15,13 @@ import {
   db, 
   hashPassword, 
   verifyPassword, 
-  UserRecord 
+  UserRecord,
+  PendingRegistration
 } from './src/server/db.ts';
 import { sendOtpEmail } from './src/server/email.ts';
+import { smsService } from './src/server/sms/sms-provider.ts';
+import { otpService } from './src/services/otpService.ts';
+import { normalizeRegistrationPhone, maskPhoneForDisplay } from './src/server/sms/phone-normalizer.ts';
 import { 
   evaluateThreatRisk, 
   advancePatchStage, 
@@ -27,6 +31,9 @@ import {
 } from './src/utils/security-engine.ts';
 import { calculateLinkRiskScore } from './src/services/link-analyzer.ts';
 import { GoogleGenAI } from '@google/genai';
+import { verifyPhoneNumber } from './src/server/verification/phone-verifier.ts';
+import { verifyUrl } from './src/server/verification/url-verifier.ts';
+import { verifyDocument } from './src/server/verification/document-verifier.ts';
 
 dotenv.config();
 
@@ -34,7 +41,7 @@ const app = express();
 const PORT = 3000;
 const HOST = '0.0.0.0';
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '25mb' }));
 
 // In-memory rate limiter
 interface RateLimitEntry {
@@ -137,17 +144,46 @@ export function validatePasswordPolicy(password: string): { valid: boolean; mess
   return { valid: true, message: '' };
 }
 
-// Registration
+// Registration (Mandatory Mobile OTP with India +91 First, Optional Email, Atomic Commit)
 app.post('/api/auth/register', rateLimiter(10, 60000), async (req: Request, res: Response) => {
   try {
-    const { username, email, displayName, password, confirmPassword } = req.body;
+    const { username, mobileNumber, phoneNumber, email, displayName, password, confirmPassword } = req.body;
+    const phoneInput = mobileNumber || phoneNumber;
 
     if (!username || !username.trim()) {
       return res.status(400).json({ error: 'Username is required.' });
     }
-    if (!email || !email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      return res.status(400).json({ error: 'A valid email address is required.' });
+
+    const cleanUser = username.trim();
+    if (!/^[a-zA-Z0-9._-]+$/.test(cleanUser) || cleanUser.length < 3 || cleanUser.length > 32) {
+      return res.status(400).json({ 
+        error: 'Username must be 3-32 characters long and may only contain letters, numbers, dots, dashes, or underscores.' 
+      });
     }
+
+    if (!phoneInput || !phoneInput.trim()) {
+      return res.status(400).json({ error: 'Mobile number is mandatory for registration.' });
+    }
+
+    // Normalize and validate mobile number (India +91 First)
+    const phoneNorm = normalizeRegistrationPhone(phoneInput, '+91');
+    if (!phoneNorm.valid || !phoneNorm.e164) {
+      return res.status(400).json({ error: phoneNorm.error || 'Invalid mobile phone number.' });
+    }
+
+    // Optional email validation
+    let cleanEmail: string | undefined = undefined;
+    if (email && email.trim()) {
+      const emailTrimmed = email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+        return res.status(400).json({ error: 'Provided email address is invalid. Please enter a valid email or leave it empty.' });
+      }
+      if (db.getUserByEmail(emailTrimmed)) {
+        return res.status(409).json({ error: `An account with email "${emailTrimmed}" already exists. Please log in or reset password.` });
+      }
+      cleanEmail = emailTrimmed;
+    }
+
     if (password !== confirmPassword) {
       return res.status(400).json({ error: 'Password and confirm password do not match.' });
     }
@@ -157,57 +193,85 @@ app.post('/api/auth/register', rateLimiter(10, 60000), async (req: Request, res:
       return res.status(400).json({ error: policy.message });
     }
 
-    const cleanUser = username.trim();
-    const cleanEmail = email.trim().toLowerCase();
-
     if (db.getUserByUsername(cleanUser)) {
       return res.status(409).json({ error: `Username "${cleanUser}" is already taken. Please choose another.` });
     }
-    if (db.getUserByEmail(cleanEmail)) {
-      return res.status(409).json({ error: `An account with email "${cleanEmail}" already exists. Please log in or reset password.` });
+
+    if (db.getUserByPhoneNumber(phoneNorm.e164)) {
+      return res.status(409).json({ 
+        error: `An account with mobile number "${maskPhoneForDisplay(phoneNorm.e164)}" already exists. Please log in or reset password.` 
+      });
+    }
+
+    // Cooldown check on rapid re-registration
+    const existingPending = db.getPendingRegistration(cleanUser) || db.getPendingRegistration(phoneNorm.e164);
+    if (existingPending && Date.now() - existingPending.lastOtpSentAt < 30000) {
+      const waitSec = Math.ceil((30000 - (Date.now() - existingPending.lastOtpSentAt)) / 1000);
+      return res.status(429).json({
+        error: `Please wait ${waitSec}s before requesting another verification code.`,
+        cooldownSeconds: waitSec,
+      });
     }
 
     const { hash, salt } = hashPassword(password);
-    const now = new Date().toISOString();
 
-    // Normal role assigned by default (never client-specified admin)
-    const newUser: UserRecord = {
-      id: `USR-${crypto.randomInt(1000, 9999)}`,
-      username: cleanUser,
-      email: cleanEmail,
-      displayName: displayName?.trim() || cleanUser,
-      passwordHash: hash,
-      salt,
-      role: 'TIER_1_ANALYST',
-      isVerified: false,
-      registeredAt: now,
-      currentLogin: now,
-      previousLogin: null,
-      failedAttempts: 0,
-      lockoutUntil: null,
-      authMethod: 'PASSWORD_BIOMETRIC',
-    };
-
-    db.createUser(newUser);
-
-    // Create dynamic OTP for registration verification
-    const { code } = db.createOtp(cleanUser, 'REGISTRATION');
-    const delivery = await sendOtpEmail({
-      toEmail: cleanEmail,
-      username: cleanUser,
-      otpCode: code,
+    // Dispatch OTP challenge via centralized otpService with carrier adapter
+    const otpResult = await otpService.createAndSendChallenge({
+      phoneNumber: phoneNorm.e164,
       purpose: 'REGISTRATION',
+      username: cleanUser,
     });
 
-    db.appendAuditLog('USER_REGISTRATION', cleanEmail, 'TIER_1_ANALYST', `Account: ${cleanUser}`, 'APPROVAL_PENDING');
+    if (otpResult.deliveryState === 'DELIVERY_FAILED' || otpResult.deliveryState === 'SMS_SERVICE_UNAVAILABLE') {
+      return res.status(502).json({
+        error: `Failed to dispatch SMS verification code: ${otpResult.message}. Please check mobile number or retry.`,
+        deliveryState: otpResult.deliveryState,
+        provider: otpResult.provider,
+        canRetry: true,
+      });
+    }
 
-    return res.status(201).json({
+    // Save pending registration record (Atomic: not committed to permanent users until verified)
+    const pendingRegistration: PendingRegistration = {
+      challengeId: otpResult.challengeId,
+      username: cleanUser,
+      displayName: displayName?.trim() || cleanUser,
+      email: cleanEmail,
+      phoneNumber: phoneNorm.e164,
+      passwordHash: hash,
+      salt,
+      createdAt: Date.now(),
+      lastOtpSentAt: Date.now(),
+    };
+    db.setPendingRegistration(pendingRegistration);
+
+    // Synchronize challenge into local DB store for backward-compatible verification
+    if (otpResult.devOtpCode) {
+      db.createMobileOtp(phoneNorm.e164, 'REGISTRATION', 300);
+    }
+
+    db.appendAuditLog(
+      'USER_REGISTRATION_OTP_SENT', 
+      phoneNorm.e164, 
+      'TIER_1_ANALYST', 
+      `Account: ${cleanUser} | State: ${otpResult.deliveryState} | Provider: ${otpResult.provider}`, 
+      'APPROVAL_PENDING'
+    );
+
+    return res.status(200).json({
       success: true,
-      message: `Account created! Verification code sent to ${cleanEmail}. Please verify your OTP to activate.`,
+      status: otpResult.deliveryState,
+      deliveryState: otpResult.deliveryState,
+      isConfigured: otpResult.isConfigured,
+      message: otpResult.message,
       requiresVerification: true,
       username: cleanUser,
-      email: cleanEmail,
-      devHint: process.env.NODE_ENV !== 'production' ? delivery.message : undefined,
+      phoneNumber: phoneNorm.e164,
+      mobileMasked: otpResult.maskedMobile,
+      cooldownSeconds: otpResult.cooldownSeconds,
+      provider: otpResult.provider,
+      devHint: otpResult.devHint,
+      devOtpCode: otpResult.devOtpCode,
     });
   } catch (err: any) {
     console.error('Registration error:', err);
@@ -215,43 +279,165 @@ app.post('/api/auth/register', rateLimiter(10, 60000), async (req: Request, res:
   }
 });
 
-// Verify Registration OTP
-app.post('/api/auth/verify-registration', rateLimiter(10, 60000), (req: Request, res: Response) => {
+// Resend Registration Mobile OTP (Enforces 45s Cooldown & Provider Dispatch)
+app.post('/api/auth/resend-otp', rateLimiter(10, 60000), async (req: Request, res: Response) => {
   try {
-    const { username, otpCode } = req.body;
-    if (!username || !otpCode) {
-      return res.status(400).json({ error: 'Username and verification code are required.' });
+    const { username, mobileNumber, phoneNumber } = req.body;
+    const identifier = username || mobileNumber || phoneNumber;
+    if (!identifier) {
+      return res.status(400).json({ error: 'Username or mobile number is required to resend OTP.' });
     }
 
-    const verification = db.verifyOtp(username, otpCode, 'REGISTRATION');
-    if (!verification.valid) {
-      return res.status(400).json({ error: verification.error });
+    const pending = db.getPendingRegistration(identifier);
+    if (!pending) {
+      return res.status(404).json({ error: 'No pending registration session found. Please fill out the registration form.' });
     }
 
-    const user = db.getUserByUsername(username);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found.' });
+    const otpResult = await otpService.resendChallenge(pending.phoneNumber);
+    if (!otpResult.success && otpResult.cooldownSeconds > 0) {
+      return res.status(429).json({
+        error: otpResult.message,
+        cooldownSeconds: otpResult.cooldownSeconds,
+      });
     }
 
-    db.updateUser(username, { isVerified: true });
-    db.appendAuditLog('ACCOUNT_VERIFIED_OTP', user.email, user.role, `Account: ${username}`, 'SUCCESS');
+    if (otpResult.deliveryState === 'DELIVERY_FAILED' || otpResult.deliveryState === 'SMS_SERVICE_UNAVAILABLE') {
+      return res.status(502).json({
+        error: `Failed to resend SMS: ${otpResult.message}. Please retry.`,
+        deliveryState: otpResult.deliveryState,
+        provider: otpResult.provider,
+      });
+    }
 
-    // Create session
-    const session = db.createSession(user);
+    pending.lastOtpSentAt = Date.now();
+    pending.challengeId = otpResult.challengeId;
+    db.setPendingRegistration(pending);
 
     return res.json({
       success: true,
-      message: 'Account verified successfully! Welcome to DarkWatch AI.',
+      status: otpResult.deliveryState,
+      deliveryState: otpResult.deliveryState,
+      isConfigured: otpResult.isConfigured,
+      message: otpResult.message,
+      cooldownSeconds: 45,
+      mobileMasked: otpResult.maskedMobile,
+      provider: otpResult.provider,
+      devHint: otpResult.devHint,
+      devOtpCode: otpResult.devOtpCode,
+    });
+  } catch (err: any) {
+    console.error('Resend OTP error:', err);
+    return res.status(500).json({ error: 'Failed to resend verification code.' });
+  }
+});
+
+// Cancel or Invalidate Pending Registration (when user edits registration details)
+app.post('/api/auth/cancel-pending-registration', (req: Request, res: Response) => {
+  try {
+    const { username, mobileNumber, phoneNumber } = req.body;
+    const identifier = username || mobileNumber || phoneNumber;
+    if (identifier) {
+      const pending = db.getPendingRegistration(identifier);
+      if (pending) {
+        otpService.invalidateChallenge(pending.phoneNumber);
+        db.removePendingRegistration(pending);
+      }
+    }
+    return res.json({ success: true, message: 'Pending challenge invalidated.' });
+  } catch {
+    return res.json({ success: true });
+  }
+});
+
+// Diagnostic SMS Provider Status
+app.get('/api/auth/sms-provider-status', (req: Request, res: Response) => {
+  const status = otpService.getProviderStatus();
+  return res.json({
+    status: status.configured ? 'CONFIGURED' : 'UNCONFIGURED',
+    ...status,
+  });
+});
+
+// Verify Registration OTP & Commit Account Creation
+app.post('/api/auth/verify-registration', rateLimiter(10, 60000), (req: Request, res: Response) => {
+  try {
+    const { username, mobileNumber, phoneNumber, otpCode } = req.body;
+    const queryId = username || mobileNumber || phoneNumber;
+
+    if (!queryId || !otpCode) {
+      return res.status(400).json({ error: 'Username/mobile and verification code are required.' });
+    }
+
+    const pending = db.getPendingRegistration(queryId);
+    if (!pending) {
+      return res.status(404).json({ 
+        error: 'Registration session expired or not found. Please submit registration to receive an OTP.' 
+      });
+    }
+
+    // Verify OTP via otpService, falling back to db.verifyOtp if needed
+    let verification = otpService.verifyChallenge({
+      phoneNumber: pending.phoneNumber,
+      otpCode: otpCode.trim(),
+      purpose: 'REGISTRATION',
+    });
+
+    if (!verification.success) {
+      const dbVerification = db.verifyOtp(pending.phoneNumber, otpCode.trim(), 'REGISTRATION');
+      if (dbVerification.valid) {
+        verification = { success: true, message: 'Verification successful.' };
+      } else {
+        return res.status(400).json({ 
+          error: verification.message || dbVerification.error,
+          attemptsRemaining: verification.attemptsRemaining,
+          isMaxAttemptsExceeded: verification.isMaxAttemptsExceeded,
+        });
+      }
+    }
+
+    // OTP Verified! Atomically create permanent user record
+    const now = new Date().toISOString();
+    const newUser: UserRecord = {
+      id: `USR-${crypto.randomInt(1000, 9999)}`,
+      username: pending.username,
+      email: pending.email,
+      displayName: pending.displayName || pending.username,
+      phoneNumber: pending.phoneNumber,
+      passwordHash: pending.passwordHash,
+      salt: pending.salt,
+      role: 'TIER_1_ANALYST',
+      isVerified: true,
+      registeredAt: now,
+      currentLogin: now,
+      previousLogin: null,
+      failedAttempts: 0,
+      lockoutUntil: null,
+      authMethod: 'PASSWORD_BIOMETRIC',
+      mobileVerifiedAt: now,
+    };
+
+    db.createUser(newUser);
+    db.removePendingRegistration(pending);
+    otpService.invalidateChallenge(pending.phoneNumber);
+    db.appendAuditLog('ACCOUNT_VERIFIED_OTP', newUser.phoneNumber || newUser.email || newUser.username, newUser.role, `Account: ${newUser.username}`, 'SUCCESS');
+
+    // Create session
+    const session = db.createSession(newUser);
+
+    return res.json({
+      success: true,
+      message: 'Mobile OTP verified successfully! Account created in persistent database.',
       token: session.token,
       user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        displayName: user.displayName,
-        role: user.role,
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+        phoneNumber: newUser.phoneNumber,
+        displayName: newUser.displayName,
+        role: newUser.role,
         isVerified: true,
-        currentLogin: user.currentLogin,
-        previousLogin: user.previousLogin,
+        currentLogin: newUser.currentLogin,
+        previousLogin: newUser.previousLogin,
       },
     });
   } catch (err: any) {
@@ -260,17 +446,27 @@ app.post('/api/auth/verify-registration', rateLimiter(10, 60000), (req: Request,
   }
 });
 
-// Login
+// Login (Supports Username, Email, or Normalized Mobile Number)
 app.post('/api/auth/login', rateLimiter(15, 60000), (req: Request, res: Response) => {
   try {
     const { identifier, password, authMethod } = req.body;
     if (!identifier || !password) {
-      return res.status(400).json({ error: 'Username/email and password are required.' });
+      return res.status(400).json({ error: 'Username/email/mobile and password are required.' });
     }
 
-    const user = db.findUser(identifier);
+    const cleanInput = identifier.trim();
+    let user = db.findUser(cleanInput);
+
+    // If not found directly, attempt mobile number normalization (+91 default)
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials. Please verify username and password.' });
+      const norm = normalizeRegistrationPhone(cleanInput, '+91');
+      if (norm.valid && norm.e164) {
+        user = db.getUserByPhoneNumber(norm.e164);
+      }
+    }
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials. Please verify username/mobile and password.' });
     }
 
     // Check account lockout (5 attempts -> 24h lockout)
@@ -295,7 +491,7 @@ app.post('/api/auth/login', rateLimiter(15, 60000), (req: Request, res: Response
       });
 
       if (lockoutUntil) {
-        db.appendAuditLog('ACCOUNT_LOCKED_FAILED_LOGINS', user.email, user.role, `User: ${user.username}`, 'REJECTED');
+        db.appendAuditLog('ACCOUNT_LOCKED_FAILED_LOGINS', user.email || user.phoneNumber || user.username, user.role, `User: ${user.username}`, 'REJECTED');
         return res.status(403).json({
           error: 'Maximum 5 failed attempts reached. Account is locked for 24 hours.',
         });
@@ -318,7 +514,7 @@ app.post('/api/auth/login', rateLimiter(15, 60000), (req: Request, res: Response
     })!;
 
     const session = db.createSession(updated);
-    db.appendAuditLog('USER_LOGIN_SUCCESS', updated.email, updated.role, `${authMethod || 'PASSWORD'} Auth`, 'SUCCESS');
+    db.appendAuditLog('USER_LOGIN_SUCCESS', updated.email || updated.phoneNumber || updated.username, updated.role, `${authMethod || 'PASSWORD'} Auth`, 'SUCCESS');
 
     return res.json({
       success: true,
@@ -342,15 +538,153 @@ app.post('/api/auth/login', rateLimiter(15, 60000), (req: Request, res: Response
   }
 });
 
-// Forgot Password - Dynamic OTP request
+// Send Mobile OTP for Login (Carrier SMS)
+app.post('/api/auth/send-login-otp', rateLimiter(10, 60000), async (req: Request, res: Response) => {
+  try {
+    const { identifier } = req.body;
+    if (!identifier || !identifier.trim()) {
+      return res.status(400).json({ error: 'Please enter your registered mobile number or username.' });
+    }
+
+    const cleanInput = identifier.trim();
+    let user = db.findUser(cleanInput);
+    if (!user) {
+      const norm = normalizeRegistrationPhone(cleanInput, '+91');
+      if (norm.valid && norm.e164) {
+        user = db.getUserByPhoneNumber(norm.e164);
+      }
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'No registered user matches that identifier. Please register first.' });
+    }
+
+    // Determine target phone number
+    let targetPhone = user.phoneNumber;
+    if (!targetPhone) {
+      const norm = normalizeRegistrationPhone(cleanInput, '+91');
+      if (norm.valid && norm.e164) {
+        targetPhone = norm.e164;
+      } else {
+        // Fallback mobile for preset demo accounts
+        targetPhone = '+919876543210';
+      }
+    }
+
+    // Generate dynamic 6-digit OTP with 5-minute expiry
+    const { code } = db.createMobileOtp(targetPhone, 'MFA_STEPUP', 300);
+    const maskedMobile = maskPhoneForDisplay(targetPhone);
+
+    const delivery = await smsService.sendOtp({
+      toPhoneNumber: targetPhone,
+      otpCode: code,
+      purpose: 'LOGIN_OTP',
+    });
+
+    if (delivery.status === 'FAILED') {
+      return res.status(502).json({ error: `Failed to dispatch login SMS: ${delivery.message}` });
+    }
+
+    db.appendAuditLog('LOGIN_OTP_DISPATCHED', user.email || targetPhone, user.role, `User: ${user.username}`, 'SUCCESS');
+
+    return res.json({
+      success: true,
+      message: `A 6-digit OTP has been dispatched via SMS to ${maskedMobile}. Valid for 5 minutes.`,
+      cooldownSeconds: 45,
+      mobileMasked: maskedMobile,
+      deliveryStatus: delivery.status,
+      provider: delivery.provider,
+      devHint: process.env.NODE_ENV !== 'production' ? delivery.devHint : undefined,
+    });
+  } catch (err: any) {
+    console.error('Send login OTP error:', err);
+    return res.status(500).json({ error: 'Failed to dispatch login OTP.' });
+  }
+});
+
+// Verify Mobile OTP for Login
+app.post('/api/auth/verify-login-otp', rateLimiter(15, 60000), (req: Request, res: Response) => {
+  try {
+    const { identifier, otpCode } = req.body;
+    if (!identifier || !otpCode) {
+      return res.status(400).json({ error: 'Mobile number/username and OTP code are required.' });
+    }
+
+    const cleanInput = identifier.trim();
+    let user = db.findUser(cleanInput);
+    if (!user) {
+      const norm = normalizeRegistrationPhone(cleanInput, '+91');
+      if (norm.valid && norm.e164) {
+        user = db.getUserByPhoneNumber(norm.e164);
+      }
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'User record not found.' });
+    }
+
+    let targetPhone = user.phoneNumber;
+    if (!targetPhone) {
+      const norm = normalizeRegistrationPhone(cleanInput, '+91');
+      targetPhone = norm.valid && norm.e164 ? norm.e164 : '+919876543210';
+    }
+
+    const verification = db.verifyOtp(targetPhone, otpCode, 'MFA_STEPUP');
+    if (!verification.valid) {
+      return res.status(400).json({ error: verification.error });
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated = db.updateUser(user.username, {
+      previousLogin: user.currentLogin,
+      currentLogin: nowIso,
+      failedAttempts: 0,
+      lockoutUntil: null,
+      authMethod: 'MOBILE_OTP',
+    })!;
+
+    const session = db.createSession(updated);
+    db.appendAuditLog('USER_LOGIN_SUCCESS', updated.email || targetPhone, updated.role, 'Carrier Mobile OTP Auth', 'SUCCESS');
+
+    return res.json({
+      success: true,
+      message: 'Mobile OTP verified. Authentication successful.',
+      token: session.token,
+      user: {
+        id: updated.id,
+        username: updated.username,
+        email: updated.email,
+        phoneNumber: updated.phoneNumber,
+        displayName: updated.displayName,
+        role: updated.role,
+        isVerified: updated.isVerified,
+        currentLogin: updated.currentLogin,
+        previousLogin: updated.previousLogin,
+        authMethod: updated.authMethod,
+      },
+    });
+  } catch (err: any) {
+    console.error('Verify login OTP error:', err);
+    return res.status(500).json({ error: 'Failed to verify login OTP.' });
+  }
+});
+
+// Forgot Password - Dynamic OTP request (Supports Mobile SMS & Email)
 app.post('/api/auth/forgot-password', rateLimiter(5, 60000), async (req: Request, res: Response) => {
   try {
     const { identifier } = req.body;
     if (!identifier || !identifier.trim()) {
-      return res.status(400).json({ error: 'Please enter your registered username or email address.' });
+      return res.status(400).json({ error: 'Please enter your registered username, mobile number, or email.' });
     }
 
-    const user = db.findUser(identifier);
+    const cleanInput = identifier.trim();
+    let user = db.findUser(cleanInput);
+    if (!user) {
+      const norm = normalizeRegistrationPhone(cleanInput, '+91');
+      if (norm.valid && norm.e164) {
+        user = db.getUserByPhoneNumber(norm.e164);
+      }
+    }
 
     // Generic safe response to prevent user enumeration
     if (!user) {
@@ -360,21 +694,43 @@ app.post('/api/auth/forgot-password', rateLimiter(5, 60000), async (req: Request
       });
     }
 
-    const { code } = db.createOtp(user.username, 'PASSWORD_RESET');
-    const delivery = await sendOtpEmail({
-      toEmail: user.email,
-      username: user.username,
-      otpCode: code,
-      purpose: 'PASSWORD_RESET',
-    });
+    let devHintMsg: string | undefined = undefined;
 
-    db.appendAuditLog('PASSWORD_RESET_OTP_REQUEST', user.email, user.role, `Account: ${user.username}`, 'SUCCESS');
+    if (user.phoneNumber) {
+      // Primary: Dispatch OTP via Mobile SMS
+      const { code } = db.createMobileOtp(user.phoneNumber, 'PASSWORD_RESET', 300);
+      const delivery = await smsService.sendOtp({
+        toPhoneNumber: user.phoneNumber,
+        otpCode: code,
+        purpose: 'PASSWORD_RESET',
+      });
+      devHintMsg = delivery.devHint;
+      db.appendAuditLog('PASSWORD_RESET_OTP_REQUEST', user.phoneNumber, user.role, `Account: ${user.username} | SMS`, 'SUCCESS');
 
-    return res.json({
-      success: true,
-      message: `If an account matches that identifier, a secure verification code has been dispatched to the registered email.`,
-      devHint: process.env.NODE_ENV !== 'production' ? delivery.message : undefined,
-    });
+      return res.json({
+        success: true,
+        message: `A 6-digit recovery OTP has been dispatched via SMS to ${maskPhoneForDisplay(user.phoneNumber)}. Valid for 5 minutes.`,
+        devHint: process.env.NODE_ENV !== 'production' ? devHintMsg : undefined,
+      });
+    } else {
+      // Fallback for legacy accounts without registered mobile number
+      const { code } = db.createOtp(user.username, 'PASSWORD_RESET');
+      const targetEmail = user.email || `${user.username}@darkwatch.corp`;
+      const delivery = await sendOtpEmail({
+        toEmail: targetEmail,
+        username: user.username,
+        otpCode: code,
+        purpose: 'PASSWORD_RESET',
+      });
+      devHintMsg = delivery.message;
+      db.appendAuditLog('PASSWORD_RESET_OTP_REQUEST', targetEmail, user.role, `Account: ${user.username} | Email`, 'SUCCESS');
+
+      return res.json({
+        success: true,
+        message: `A secure verification code has been dispatched to ${targetEmail}.`,
+        devHint: process.env.NODE_ENV !== 'production' ? devHintMsg : undefined,
+      });
+    }
   } catch (err: any) {
     console.error('Forgot password error:', err);
     return res.status(500).json({ error: 'Failed to process password recovery request.' });
@@ -416,7 +772,7 @@ app.post('/api/auth/reset-password', rateLimiter(10, 60000), (req: Request, res:
       lockoutUntil: null,
     });
 
-    db.appendAuditLog('PASSWORD_RESET_COMPLETE', user.email, user.role, `Account: ${user.username}`, 'SUCCESS');
+    db.appendAuditLog('PASSWORD_RESET_COMPLETE', user.email || user.phoneNumber || user.username, user.role, `Account: ${user.username}`, 'SUCCESS');
 
     return res.json({
       success: true,
@@ -828,6 +1184,104 @@ app.get('/api/health', (req: Request, res: Response) => {
     version: '2.5.0-production',
     sha256VerificationActive: true,
     timestamp: new Date().toISOString(),
+  });
+});
+
+// ============================================================================
+// AUTHENTICITY, SCAM & THREAT VERIFICATION CENTER ENDPOINTS
+// ============================================================================
+
+// 1. Phone Number Verification (India +91 First)
+app.post('/api/verification/phone', rateLimiter(30, 60000), async (req: Request, res: Response) => {
+  try {
+    const { phoneNumber, countryCode = '+91' } = req.body;
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+      return res.status(400).json({ error: 'Valid phoneNumber string is required.' });
+    }
+    const result = await verifyPhoneNumber(phoneNumber, countryCode);
+    db.appendAuditLog(
+      'PHONE_VERIFICATION_CHECK',
+      'system',
+      'TIER_1_ANALYST',
+      `Checked ${result.maskedNumber} (${result.reputationStatus})`,
+      result.sharedClassification === 'MALICIOUS_FRAUD_CONFIRMED' ? 'REJECTED' : 'SUCCESS'
+    );
+    return res.json(result);
+  } catch (err: any) {
+    console.error('Phone verification error:', err);
+    return res.status(500).json({ error: err.message || 'Phone verification processing failed.' });
+  }
+});
+
+// 2. Website / URL Verification
+app.post('/api/verification/url', rateLimiter(30, 60000), async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'Valid url string is required.' });
+    }
+    const result = await verifyUrl(url);
+    db.appendAuditLog(
+      'URL_VERIFICATION_CHECK',
+      'system',
+      'TIER_1_ANALYST',
+      `Checked URL ${result.hostname || url} (${result.sharedClassification})`,
+      result.sharedClassification === 'MALICIOUS_FRAUD_CONFIRMED' ? 'REJECTED' : 'SUCCESS'
+    );
+    return res.json(result);
+  } catch (err: any) {
+    console.error('URL verification error:', err);
+    return res.status(500).json({ error: err.message || 'URL verification processing failed.' });
+  }
+});
+
+// 3. Document / Exam Paper Verification
+app.post('/api/verification/document', rateLimiter(20, 60000), async (req: Request, res: Response) => {
+  try {
+    const { fileName, fileBase64, mimeType, claimedIssuer, claimedExamId, extractedTextHint } = req.body;
+    if (!fileName || !fileBase64) {
+      return res.status(400).json({ error: 'Document fileName and fileBase64 are required.' });
+    }
+    const buffer = Buffer.from(fileBase64, 'base64');
+    const result = await verifyDocument({
+      fileName,
+      fileBuffer: buffer,
+      mimeType: mimeType || 'application/pdf',
+      claimedIssuer,
+      claimedExamId,
+      extractedTextHint,
+    });
+    db.appendAuditLog(
+      'DOCUMENT_VERIFICATION_CHECK',
+      'system',
+      'TIER_1_ANALYST',
+      `Verified ${fileName} (${result.verificationStatus})`,
+      result.verificationStatus === 'CONFIRMED MISMATCH' ? 'REJECTED' : 'SUCCESS'
+    );
+    return res.json(result);
+  } catch (err: any) {
+    console.error('Document verification error:', err);
+    return res.status(500).json({ error: err.message || 'Document verification processing failed.' });
+  }
+});
+
+// 4. Provider Transparency & Capabilities
+app.get('/api/verification/providers', (req: Request, res: Response) => {
+  res.json({
+    phoneReputationProvider: {
+      name: 'Telecom Intelligence Provider Adapter',
+      configured: Boolean(process.env.PHONE_REPUTATION_API_KEY || process.env.NUMVERIFY_API_KEY),
+      supportedCountries: ['+91 (India - Default)', '+1 (US/Canada)', '+44 (UK)', 'International'],
+    },
+    urlThreatIntelligence: {
+      name: 'Global Threat Intelligence Feed',
+      configured: Boolean(process.env.SAFE_BROWSING_API_KEY || process.env.VIRUSTOTAL_API_KEY),
+    },
+    documentAuthoritativeRegistry: {
+      name: 'Institutional Examination Repository',
+      configured: true,
+      recordsCount: 2,
+    },
   });
 });
 

@@ -50,8 +50,11 @@ import {
   registerNewAccount, 
   authenticateRegisteredUser,
   apiRegisterAccount,
+  apiResendRegistrationOtp,
   apiVerifyRegistrationOtp,
   apiLogin,
+  apiSendLoginOtp,
+  apiVerifyLoginOtp,
   apiForgotPassword,
   apiResetPassword,
   validatePasswordStrength,
@@ -79,6 +82,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   // Registration Form State
   const [regDisplayName, setRegDisplayName] = useState<string>('');
   const [regUsername, setRegUsername] = useState<string>('');
+  const [regMobileNumber, setRegMobileNumber] = useState<string>('');
+  const [regCountryCode, setRegCountryCode] = useState<string>('+91');
   const [regEmail, setRegEmail] = useState<string>('');
   const [regPassword, setRegPassword] = useState<string>('');
   const [regConfirmPassword, setRegConfirmPassword] = useState<string>('');
@@ -87,7 +92,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [regOtpSent, setRegOtpSent] = useState<boolean>(false);
   const [regOtpCode, setRegOtpCode] = useState<string>('');
   const [regOtpTimer, setRegOtpTimer] = useState<number>(0);
+  const [regMobileMasked, setRegMobileMasked] = useState<string>('');
   const [regErrorMsg, setRegErrorMsg] = useState<string | null>(null);
+  const [regDeliveryState, setRegDeliveryState] = useState<string | null>(null);
+  const [regProviderName, setRegProviderName] = useState<string | null>(null);
+  const [regIsConfigured, setRegIsConfigured] = useState<boolean>(false);
+  const [regDevOtpCode, setRegDevOtpCode] = useState<string | null>(null);
 
   // Mobile OTP State
   const [mobileNumber, setMobileNumber] = useState<string>('');
@@ -95,6 +105,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [otpCode, setOtpCode] = useState<string>('');
   const [otpTimer, setOtpTimer] = useState<number>(0);
   const [isOtpVerified, setIsOtpVerified] = useState<boolean>(false);
+  const [loginDevHintOtp, setLoginDevHintOtp] = useState<string | null>(null);
+  const [maskedLoginPhone, setMaskedLoginPhone] = useState<string | null>(null);
 
   // Face Authentication State
   const [cameraConsented, setCameraConsented] = useState<boolean>(false);
@@ -291,42 +303,63 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }, 180);
   };
 
-  // Trigger Send OTP
-  const handleSendOtp = () => {
-    const cleanPhone = mobileNumber.trim();
-    if (!cleanPhone || cleanPhone.length < 8) {
-      setErrorMsg('Please enter a valid mobile number with country code');
+  // Trigger Send Mobile OTP for Login
+  const handleSendOtp = async () => {
+    const cleanPhone = mobileNumber.trim() || usernameInput.trim();
+    if (!cleanPhone || cleanPhone.length < 4) {
+      setErrorMsg('Please enter your registered mobile number (+91) or username.');
+      cyberAudio.playWarning();
       return;
     }
 
     setErrorMsg(null);
-    setOtpSent(true);
-    setOtpCode('742891');
-    setOtpTimer(30);
+    setIsLoading(true);
     cyberAudio.playClick();
-    setSuccessMsg(`OTP dispatched to ${cleanPhone}. Demo Code: 742891`);
 
-    const interval = setInterval(() => {
-      setOtpTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const res = await apiSendLoginOtp(cleanPhone);
+    setIsLoading(false);
+
+    if (res.success) {
+      setOtpSent(true);
+      setOtpTimer(res.cooldownSeconds || 45);
+      if (res.mobileMasked) setMaskedLoginPhone(res.mobileMasked);
+      setSuccessMsg(res.message);
+      cyberAudio.playSuccess();
+      if (res.devHint) {
+        console.log('[DarkWatch Dev Notice]:', res.devHint);
+        const match = res.devHint.match(/\b\d{6}\b/);
+        if (match) setLoginDevHintOtp(match[0]);
+      }
+    } else {
+      setErrorMsg(res.message);
+      cyberAudio.playWarning();
+    }
   };
 
-  const handleVerifyOtp = () => {
-    const code = otpCode.trim() || '742891';
-    if (code === '742891' || code.length === 6) {
-      setOtpCode(code);
+  const handleVerifyOtp = async () => {
+    const code = otpCode.trim();
+    if (!code || code.length < 6) {
+      setErrorMsg('Please enter the 6-digit OTP received via SMS.');
+      cyberAudio.playWarning();
+      return;
+    }
+
+    const cleanPhone = mobileNumber.trim() || usernameInput.trim();
+    setIsLoading(true);
+    cyberAudio.playClick();
+
+    const res = await apiVerifyLoginOtp(cleanPhone, code);
+    setIsLoading(false);
+
+    if (res.success && res.userProfile) {
       setIsOtpVerified(true);
       setErrorMsg(null);
-      setSuccessMsg('Carrier OTP validated with 2048-bit zero-trust signature.');
+      setSuccessMsg('Mobile OTP verified successfully! Entering DarkWatch AI...');
       cyberAudio.playSuccess();
+      stopCamera();
+      onLoginSuccess(res.userProfile);
     } else {
-      setErrorMsg('Invalid OTP code. Please enter demo OTP 742891 to proceed.');
+      setErrorMsg(res.message);
       cyberAudio.playWarning();
     }
   };
@@ -357,15 +390,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     handleStartFaceScan();
   };
 
-  // Handle Registration Form Submission
+  // Handle Registration Form Submission (Mandatory Mobile OTP, Optional Email)
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegErrorMsg(null);
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!regEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim())) {
-      setRegErrorMsg('Please enter a valid corporate or personal email address.');
+    if (!regUsername.trim()) {
+      setRegErrorMsg('Username is required.');
+      cyberAudio.playWarning();
+      return;
+    }
+
+    if (!regMobileNumber.trim()) {
+      setRegErrorMsg('Mobile number is mandatory for account verification.');
+      cyberAudio.playWarning();
+      return;
+    }
+
+    // Optional email validation: only validate syntax if entered
+    if (regEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim())) {
+      setRegErrorMsg('Please enter a valid email address or leave the email field empty.');
       cyberAudio.playWarning();
       return;
     }
@@ -386,10 +432,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
     cyberAudio.playClick();
 
+    // Combine country code (+91 default) with national number if not already prefixed
+    const formattedPhone = regMobileNumber.trim().startsWith('+')
+      ? regMobileNumber.trim()
+      : `${regCountryCode} ${regMobileNumber.trim()}`;
+
     const res = await apiRegisterAccount({
-      displayName: regDisplayName.trim(),
+      displayName: regDisplayName.trim() || regUsername.trim(),
       username: regUsername.trim(),
-      email: regEmail.trim(),
+      mobileNumber: formattedPhone,
+      email: regEmail.trim() || undefined,
       password: regPassword,
       confirmPassword: regConfirmPassword,
     });
@@ -399,12 +451,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     if (res.success) {
       cyberAudio.playSuccess();
       setRegOtpSent(true);
-      setRegOtpTimer(60);
+      setRegMobileMasked(res.mobileMasked || formattedPhone);
+      setRegOtpTimer(res.cooldownSeconds || 45);
+      setRegDeliveryState(res.deliveryState || 'SMS_REQUEST_ACCEPTED');
+      setRegProviderName(res.provider || null);
+      setRegIsConfigured(Boolean(res.isConfigured));
+      setRegDevOtpCode(res.devOtpCode || null);
       setSuccessMsg(res.message);
       if (res.devHint) {
         console.log('[DarkWatch Dev Notice]:', res.devHint);
       }
     } else {
+      setRegDeliveryState(res.deliveryState || 'DELIVERY_FAILED');
       setRegErrorMsg(res.message);
       cyberAudio.playWarning();
     }
@@ -424,12 +482,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
     cyberAudio.playClick();
 
-    const res = await apiVerifyRegistrationOtp(regUsername.trim(), regOtpCode.trim());
+    const queryTarget = regUsername.trim() || regMobileNumber.trim();
+    const res = await apiVerifyRegistrationOtp(queryTarget, regOtpCode.trim());
     setIsLoading(false);
 
     if (res.success && res.user) {
       cyberAudio.playSuccess();
-      setSuccessMsg('Account verified and activated successfully! Admitting to security portal...');
+      setSuccessMsg('Mobile OTP verified successfully! Account activated in persistent database.');
       onLoginSuccess(res.user);
     } else {
       setRegErrorMsg(res.message);
@@ -437,22 +496,51 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }
   };
 
+  // Resend Registration Mobile OTP (Enforces 45s Cooldown & Provider Dispatch)
   const handleResendRegistrationOtp = async () => {
     if (regOtpTimer > 0) return;
     setRegErrorMsg(null);
     setIsLoading(true);
     cyberAudio.playClick();
 
-    const res = await apiForgotPassword(regUsername.trim() || regEmail.trim());
+    const queryTarget = regUsername.trim() || regMobileNumber.trim();
+    const res = await apiResendRegistrationOtp(queryTarget);
     setIsLoading(false);
     if (res.success) {
-      setRegOtpTimer(60);
-      setSuccessMsg('A new 6-digit verification code has been dispatched to your email.');
+      setRegOtpTimer(res.cooldownSeconds || 45);
+      if (res.mobileMasked) setRegMobileMasked(res.mobileMasked);
+      setRegDeliveryState(res.deliveryState || 'SMS_REQUEST_ACCEPTED');
+      setRegProviderName(res.provider || null);
+      setRegIsConfigured(Boolean(res.isConfigured));
+      setRegDevOtpCode(res.devOtpCode || null);
+      setSuccessMsg(res.message);
       cyberAudio.playSuccess();
+      if (res.devHint) {
+        console.log('[DarkWatch Dev Notice]:', res.devHint);
+      }
     } else {
+      setRegDeliveryState(res.deliveryState || 'DELIVERY_FAILED');
       setRegErrorMsg(res.message);
       cyberAudio.playWarning();
     }
+  };
+
+  // Edit Registration Details (Invalidates Active Challenge & Preserves Form Data)
+  const handleEditRegistrationDetails = () => {
+    const queryTarget = regUsername.trim() || regMobileNumber.trim();
+    if (queryTarget) {
+      fetch('/api/auth/cancel-pending-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: queryTarget, mobileNumber: queryTarget }),
+      }).catch(() => {});
+    }
+    setRegOtpSent(false);
+    setRegOtpCode('');
+    setRegDeliveryState(null);
+    setRegDevOtpCode(null);
+    setRegErrorMsg(null);
+    cyberAudio.playClick();
   };
 
   const resetAndSwitchToRegister = () => {
@@ -468,11 +556,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setIsFaceVerified(false);
     setRegDisplayName('');
     setRegUsername('');
+    setRegMobileNumber('');
+    setRegCountryCode('+91');
     setRegEmail('');
     setRegPassword('');
     setRegConfirmPassword('');
     setRegOtpSent(false);
     setRegOtpCode('');
+    setRegMobileMasked('');
     setRegOtpTimer(0);
     cyberAudio.playClick();
   };
@@ -507,6 +598,31 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     if (authMethod === 'PASSWORD_BIOMETRIC' && !password && !isBiometricVerified) {
       setErrorMsg('Please enter your account password or complete the biometric passkey check');
       return;
+    }
+
+    if (authMethod === 'MOBILE_OTP') {
+      if (!isOtpVerified) {
+        if (!otpCode || otpCode.length < 6) {
+          setErrorMsg('Please enter and verify the 6-digit SMS OTP dispatched to your mobile.');
+          cyberAudio.playWarning();
+          return;
+        }
+        setIsLoading(true);
+        cyberAudio.playClick();
+        const cleanPhone = mobileNumber.trim() || userQuery;
+        const res = await apiVerifyLoginOtp(cleanPhone, otpCode.trim());
+        setIsLoading(false);
+        if (res.success && res.userProfile) {
+          stopCamera();
+          cyberAudio.playSuccess();
+          onLoginSuccess(res.userProfile);
+          return;
+        } else {
+          setErrorMsg(res.message);
+          cyberAudio.playWarning();
+          return;
+        }
+      }
     }
 
     setIsLoading(true);
@@ -797,20 +913,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
                           {otpSent && (
                             <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                              {maskedLoginPhone && (
+                                <div className="text-[11px] font-mono text-cyan-300 bg-cyan-950/40 border border-cyan-800/50 rounded-lg px-2.5 py-1 flex items-center justify-between">
+                                  <span>SMS sent to: <strong className="text-white">{maskedLoginPhone}</strong></span>
+                                  <span className="text-[10px] text-slate-400">5 min expiry</span>
+                                </div>
+                              )}
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-slate-300 font-mono text-[11px]">
                                   Enter 6-Digit OTP:
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOtpCode('742891');
-                                    cyberAudio.playClick();
-                                  }}
-                                  className="text-[10px] font-mono text-cyan-400 hover:underline bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/60 cursor-pointer"
-                                >
-                                  Auto-Fill Demo OTP (742891)
-                                </button>
+                                {loginDevHintOtp ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOtpCode(loginDevHintOtp);
+                                      cyberAudio.playClick();
+                                    }}
+                                    className="text-[10px] font-mono text-cyan-400 hover:underline bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/60 cursor-pointer"
+                                  >
+                                    Auto-Fill Test OTP ({loginDevHintOtp})
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-mono text-slate-400">
+                                    Check your mobile SMS
+                                  </span>
+                                )}
                               </div>
 
                               <div className="flex items-center gap-2">
@@ -1004,7 +1132,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                     <form onSubmit={handleRegisterSubmit} className="space-y-3.5 animate-fadeIn">
                       <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-500/30 text-[11px] font-mono text-purple-300 flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                        <span>Account Registration: Create your profile with corporate email & strong credentials.</span>
+                        <span>Account Registration: Mandatory mobile verification with India (+91) carrier SMS.</span>
                       </div>
 
                       {/* Full Name / Display Name */}
@@ -1018,7 +1146,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                           value={regDisplayName}
                           onChange={(e) => setRegDisplayName(e.target.value)}
                           placeholder="Enter your full name (e.g. Vagdevi Lead)..."
-                          required
                           className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-400 text-white font-mono text-xs outline-none"
                         />
                       </div>
@@ -1027,7 +1154,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       <div className="space-y-1">
                         <label className="text-xs font-semibold text-slate-300 font-mono flex items-center gap-1.5">
                           <KeyRound className="w-3.5 h-3.5 text-purple-400" />
-                          Desired Username:
+                          Desired Username (Required):
                         </label>
                         <input
                           type="text"
@@ -1039,19 +1166,56 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         />
                       </div>
 
-                      {/* Email Address */}
+                      {/* Mandatory Mobile Number (+91 Default) */}
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-300 font-mono flex items-center gap-1.5">
-                          <Mail className="w-3.5 h-3.5 text-cyan-400" />
-                          Corporate or Personal Email:
+                        <label className="text-xs font-semibold text-slate-300 font-mono flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                            Mobile Number (Mandatory for SMS OTP):
+                          </span>
+                          <span className="text-[10px] text-emerald-400 font-mono">India (+91) Default</span>
+                        </label>
+                        <div className="flex gap-2">
+                          <select
+                            value={regCountryCode}
+                            onChange={(e) => setRegCountryCode(e.target.value)}
+                            aria-label="Country Code"
+                            className="w-28 px-2.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-emerald-400 text-white font-mono text-xs outline-none cursor-pointer"
+                          >
+                            <option value="+91">🇮🇳 +91 (IN)</option>
+                            <option value="+1">🇺🇸 +1 (US)</option>
+                            <option value="+44">🇬🇧 +44 (UK)</option>
+                            <option value="+61">🇦🇺 +61 (AU)</option>
+                            <option value="+971">🇦🇪 +971 (AE)</option>
+                          </select>
+                          <input
+                            type="tel"
+                            value={regMobileNumber}
+                            onChange={(e) => setRegMobileNumber(e.target.value.replace(/[^\d\s\-\+]/g, ''))}
+                            placeholder="98765 43210"
+                            required
+                            className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-emerald-400 text-white font-mono text-xs outline-none placeholder:text-slate-600"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Email Address (OPTIONAL) */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-300 font-mono flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-cyan-400" />
+                            Corporate Email:
+                          </span>
+                          <span className="text-[10px] text-slate-400 px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 font-mono">
+                            Optional
+                          </span>
                         </label>
                         <input
                           type="email"
                           value={regEmail}
                           onChange={(e) => setRegEmail(e.target.value.trim())}
-                          placeholder="name@organization.corp..."
-                          required
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-400 text-white font-mono text-xs outline-none"
+                          placeholder="name@organization.corp (optional for alert digests)..."
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-cyan-400 text-white font-mono text-xs outline-none placeholder:text-slate-600"
                         />
                       </div>
 
@@ -1138,18 +1302,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-mono font-bold text-sm shadow-xl shadow-cyan-950/70 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-mono font-bold text-sm shadow-xl shadow-cyan-950/70 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                       >
                         {isLoading ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin text-cyan-200" />
-                            <span>Dispatching Verification OTP...</span>
+                            <span>Dispatching Mobile SMS OTP...</span>
                           </>
                         ) : (
                           <>
-                            <ShieldCheck className="w-4 h-4 text-cyan-300" />
-                            <span>Register & Send Verification OTP</span>
-                            <ArrowRight className="w-4 h-4 text-cyan-300" />
+                            <Smartphone className="w-4 h-4 text-emerald-300" />
+                            <span>Register & Send Mobile OTP</span>
+                            <ArrowRight className="w-4 h-4 text-emerald-300" />
                           </>
                         )}
                       </button>
@@ -1165,20 +1329,99 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                       </div>
                     </form>
                   ) : (
-                    /* REGISTRATION OTP VERIFICATION STEP */
+                    /* REGISTRATION MOBILE OTP VERIFICATION STEP */
                     <form onSubmit={handleVerifyRegistrationOtp} className="space-y-4 animate-fadeIn">
-                      <div className="p-3 rounded-xl bg-cyan-950/50 border border-cyan-500/40 text-xs font-mono space-y-1">
-                        <div className="flex items-center gap-1.5 text-cyan-300 font-bold">
-                          <Mail className="w-4 h-4" /> Account Verification Required
+                      {/* Carrier Status & Security Header */}
+                      <div className={`p-3.5 rounded-xl border text-xs font-mono space-y-2 ${
+                        regDeliveryState === 'DELIVERY_CONFIRMED'
+                          ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                          : regDeliveryState === 'SMS_SERVICE_NOT_CONFIGURED'
+                          ? 'bg-amber-950/40 border-amber-500/50 text-amber-200'
+                          : regDeliveryState === 'DELIVERY_FAILED' || regDeliveryState === 'SMS_SERVICE_UNAVAILABLE'
+                          ? 'bg-rose-950/40 border-rose-500/50 text-rose-300'
+                          : 'bg-cyan-950/50 border-cyan-500/40 text-cyan-300'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <Smartphone className="w-4 h-4 text-emerald-400" />
+                            <span>Mobile OTP Verification</span>
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
+                            regDeliveryState === 'DELIVERY_CONFIRMED'
+                              ? 'bg-emerald-900/80 text-emerald-300 border border-emerald-700/60'
+                              : regDeliveryState === 'SMS_SERVICE_NOT_CONFIGURED'
+                              ? 'bg-amber-900/80 text-amber-300 border border-amber-700/60'
+                              : regDeliveryState === 'DELIVERY_FAILED'
+                              ? 'bg-rose-900/80 text-rose-300 border border-rose-700/60'
+                              : 'bg-cyan-900/80 text-cyan-300 border border-cyan-700/60'
+                          }`}>
+                            {regDeliveryState === 'DELIVERY_CONFIRMED'
+                              ? 'Delivery Confirmed'
+                              : regDeliveryState === 'SMS_SERVICE_NOT_CONFIGURED'
+                              ? 'SMS Unconfigured'
+                              : regDeliveryState === 'DELIVERY_FAILED'
+                              ? 'Delivery Failed'
+                              : 'Request Accepted'}
+                          </span>
                         </div>
-                        <p className="text-slate-300 leading-relaxed text-[11px]">
-                          A dynamic 6-digit verification code was dispatched to <strong>{regEmail}</strong>. Valid for 10 minutes.
-                        </p>
+
+                        {/* Honest status details */}
+                        <div className="text-[11px] leading-relaxed text-slate-300">
+                          {regDeliveryState === 'DELIVERY_CONFIRMED' && (
+                            <p>Handset delivery receipt confirmed for <strong>{regMobileMasked || regMobileNumber}</strong>.</p>
+                          )}
+                          {regDeliveryState === 'SMS_REQUEST_ACCEPTED' && (
+                            <p>
+                              SMS request accepted by <strong>{regProviderName || 'Cellular Gateway'}</strong>.
+                              Queued for cellular dispatch to <strong>{regMobileMasked || regMobileNumber}</strong>. Handset delivery in transit.
+                            </p>
+                          )}
+                          {regDeliveryState === 'SMS_SERVICE_NOT_CONFIGURED' && (
+                            <div className="space-y-1">
+                              <p className="text-amber-300">
+                                <strong>Notice:</strong> No external SMS provider credentials (Twilio, Fast2SMS, MSG91) configured in environment. Physical cellular SMS cannot be dispatched to your handset.
+                              </p>
+                              {regDevOtpCode && (
+                                <p className="text-slate-300">
+                                  Development simulation mode active. You can auto-fill the generated code below to verify database persistence.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {(regDeliveryState === 'DELIVERY_FAILED' || regDeliveryState === 'SMS_SERVICE_UNAVAILABLE') && (
+                            <p className="text-rose-300">
+                              SMS dispatch could not be completed via {regProviderName || 'provider'}. Please retry or edit your mobile number.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[10px] text-slate-400">
+                          <span>Target: <strong className="text-white">{regMobileMasked || regMobileNumber}</strong></span>
+                          <span>Validity: 5 minutes</span>
+                        </div>
                       </div>
 
+                      {/* Development Auto-Fill Button if unconfigured */}
+                      {regDevOtpCode && regDeliveryState === 'SMS_SERVICE_NOT_CONFIGURED' && (
+                        <div className="p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/40 flex items-center justify-between text-xs font-mono">
+                          <span className="text-cyan-300 text-[11px]">Dev Test Code: <strong>{regDevOtpCode}</strong></span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRegOtpCode(regDevOtpCode);
+                              cyberAudio.playClick();
+                            }}
+                            className="px-2.5 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-bold cursor-pointer transition-all shadow-glow-cyan"
+                          >
+                            Auto-Fill Dev Code
+                          </button>
+                        </div>
+                      )}
+
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-300 font-mono">
-                          Enter 6-Digit Email Verification Code:
+                        <label className="text-xs font-semibold text-slate-300 font-mono flex items-center justify-between">
+                          <span>Enter 6-Digit Mobile Verification Code:</span>
+                          <span className="text-[10px] text-slate-400 font-mono">E.164 +91 Bound</span>
                         </label>
                         <input
                           type="text"
@@ -1200,12 +1443,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                           className="text-cyan-400 hover:text-cyan-300 disabled:opacity-40 disabled:hover:text-cyan-400 cursor-pointer flex items-center gap-1"
                         >
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{regOtpTimer > 0 ? `Resend code in ${regOtpTimer}s` : 'Resend Code'}</span>
+                          <span>{regOtpTimer > 0 ? `Resend SMS in ${regOtpTimer}s` : 'Resend SMS Code'}</span>
                         </button>
                         <button
                           type="button"
-                          onClick={() => setRegOtpSent(false)}
-                          className="text-slate-400 hover:text-white cursor-pointer"
+                          onClick={handleEditRegistrationDetails}
+                          className="text-slate-400 hover:text-white cursor-pointer hover:underline"
                         >
                           Edit Registration Details
                         </button>

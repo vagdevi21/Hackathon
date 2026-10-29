@@ -22,7 +22,7 @@ import { ScanHistoryRecord } from '../utils/scan-history-store.ts';
 export interface UserRecord {
   id: string;
   username: string;
-  email: string;
+  email?: string;
   displayName: string;
   passwordHash: string;
   salt: string;
@@ -35,18 +35,32 @@ export interface UserRecord {
   lockoutUntil: number | null;
   authMethod: string;
   phoneNumber?: string;
+  mobileVerifiedAt?: string;
+}
+
+export interface PendingRegistration {
+  challengeId: string;
+  username: string;
+  displayName: string;
+  email?: string;
+  phoneNumber: string; // E.164 normalized e.g. +919876543210
+  passwordHash: string;
+  salt: string;
+  createdAt: number;
+  lastOtpSentAt: number;
 }
 
 export interface OtpRecord {
   id: string;
-  identifier: string; // normalized username or email
+  identifier: string; // normalized username, email, or E.164 phone number
   otpHash: string;
   salt: string;
   purpose: 'REGISTRATION' | 'PASSWORD_RESET' | 'MFA_STEPUP';
-  expiresAt: number; // epoch ms (10 minutes)
+  expiresAt: number; // epoch ms
   attempts: number; // max 5
   isUsed: boolean;
   createdAt: number;
+  channel?: 'SMS' | 'EMAIL';
 }
 
 export interface SessionRecord {
@@ -73,6 +87,7 @@ export interface SiemIngestEvent {
 export interface DarkWatchDatabaseSchema {
   version: number;
   users: Record<string, UserRecord>; // keyed by normalized username
+  pendingRegistrations?: Record<string, PendingRegistration>; // keyed by normalized username or phone
   otps: OtpRecord[];
   sessions: Record<string, SessionRecord>; // keyed by token
   scans: ScanHistoryRecord[];
@@ -207,12 +222,44 @@ class DarkWatchDb {
 
   public getUserByEmail(email: string): UserRecord | undefined {
     const clean = email.toLowerCase().trim();
-    return Object.values(this.data.users).find((u) => u.email.toLowerCase() === clean);
+    return Object.values(this.data.users).find((u) => u.email && u.email.toLowerCase() === clean);
+  }
+
+  public getUserByPhoneNumber(phoneNumber: string): UserRecord | undefined {
+    const clean = phoneNumber.replace(/[\s\-\(\)\.]/g, '').toLowerCase().trim();
+    return Object.values(this.data.users).find((u) => {
+      if (!u.phoneNumber) return false;
+      const uPhone = u.phoneNumber.replace(/[\s\-\(\)\.]/g, '').toLowerCase().trim();
+      return uPhone === clean;
+    });
   }
 
   public findUser(identifier: string): UserRecord | undefined {
     const clean = identifier.toLowerCase().trim();
-    return this.data.users[clean] || this.getUserByEmail(clean);
+    return this.data.users[clean] || this.getUserByEmail(clean) || this.getUserByPhoneNumber(clean);
+  }
+
+  // --- Pending Registration Operations (Atomic until OTP is verified) ---
+  public setPendingRegistration(pending: PendingRegistration): void {
+    if (!this.data.pendingRegistrations) {
+      this.data.pendingRegistrations = {};
+    }
+    // Store keyed by both username and normalized mobile number
+    this.data.pendingRegistrations[pending.username.toLowerCase().trim()] = pending;
+    this.data.pendingRegistrations[pending.phoneNumber.toLowerCase().trim()] = pending;
+    this.save();
+  }
+
+  public getPendingRegistration(identifier: string): PendingRegistration | undefined {
+    if (!this.data.pendingRegistrations) return undefined;
+    return this.data.pendingRegistrations[identifier.toLowerCase().trim()];
+  }
+
+  public removePendingRegistration(pending: PendingRegistration): void {
+    if (!this.data.pendingRegistrations) return;
+    delete this.data.pendingRegistrations[pending.username.toLowerCase().trim()];
+    delete this.data.pendingRegistrations[pending.phoneNumber.toLowerCase().trim()];
+    this.save();
   }
 
   public createUser(user: UserRecord): UserRecord {
@@ -232,6 +279,40 @@ class DarkWatchDb {
   }
 
   // --- Dynamic OTP Operations ---
+  public createMobileOtp(
+    phoneNumber: string,
+    purpose: 'REGISTRATION' | 'PASSWORD_RESET' | 'MFA_STEPUP',
+    expirySeconds = 300 // 5 minutes standard
+  ): { code: string; record: OtpRecord } {
+    const clean = phoneNumber.toLowerCase().trim();
+    // Invalidate existing active OTPs for this phone number and purpose
+    this.data.otps = this.data.otps.map((o) =>
+      o.identifier === clean && o.purpose === purpose && !o.isUsed ? { ...o, isUsed: true } : o
+    );
+
+    // Cryptographically secure 6-digit random code
+    const code = crypto.randomInt(100000, 1000000).toString();
+    const salt = crypto.randomBytes(16).toString('hex');
+    const otpHash = hashOtp(code, salt);
+
+    const record: OtpRecord = {
+      id: `OTP-${crypto.randomInt(1000, 9999)}`,
+      identifier: clean,
+      otpHash,
+      salt,
+      purpose,
+      expiresAt: Date.now() + expirySeconds * 1000,
+      attempts: 0,
+      isUsed: false,
+      createdAt: Date.now(),
+      channel: 'SMS',
+    };
+
+    this.data.otps.push(record);
+    this.save();
+    return { code, record };
+  }
+
   public createOtp(
     identifier: string,
     purpose: 'REGISTRATION' | 'PASSWORD_RESET' | 'MFA_STEPUP'
@@ -257,6 +338,7 @@ class DarkWatchDb {
       attempts: 0,
       isUsed: false,
       createdAt: Date.now(),
+      channel: 'EMAIL',
     };
 
     this.data.otps.push(record);
@@ -284,7 +366,7 @@ class DarkWatchDb {
     if (now > record.expiresAt) {
       record.isUsed = true;
       this.save();
-      return { valid: false, error: 'Verification code has expired (10-minute limit). Please request a new code.' };
+      return { valid: false, error: 'Verification code has expired. Please request a new code.' };
     }
 
     if (record.attempts >= 5) {
