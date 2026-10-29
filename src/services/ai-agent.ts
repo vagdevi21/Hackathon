@@ -20,59 +20,30 @@ export interface AIAnalysisResult {
 }
 
 export async function analyzeThreatWithAI(alert: ThreatAlert): Promise<AIAnalysisResult> {
-  // Check if Gemini API key is available in runtime
-  const apiKey = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
-                 (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY);
+  // Call server-side proxy route /api/ai/analyze-threat (server handles Gemini securely)
+  try {
+    const response = await fetch('/api/ai/analyze-threat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alert }),
+    });
 
-  if (apiKey) {
-    try {
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey });
-      const prompt = `You are DarkWatch AI, an autonomous cyber defense reasoning engine.
-Analyze this security threat incident and output JSON:
-Title: ${alert.title}
-Type: ${alert.type}
-Severity: ${alert.severity}
-Confidence: ${alert.confidence}%
-Source IP: ${alert.sourceIp} (${alert.sourceCountry})
-Target Asset: ${alert.targetAsset.name} (${alert.targetAsset.type}, Criticality: ${alert.targetAsset.criticality})
-Description: ${alert.description}
-Payload: ${alert.payloadSummary}
-
-Return STRICT JSON with keys:
-"summary": string (plain language root cause explanation, explainable AI),
-"blastRadius": string (which systems or data are endangered),
-"mitreTactic": string,
-"mitreTechnique": string,
-"recommendedActions": array of strings,
-"simulationHypothesis": string (what would happen if action is taken vs ignored),
-"confidenceReasoning": string (why AI is confident)`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
+    if (response.ok) {
+      const parsed = await response.json();
+      return {
+        summary: parsed.summary,
+        blastRadius: parsed.blastRadius,
+        mitreMapping: {
+          tactic: parsed.mitreMapping?.tactic || alert.mitreTactic,
+          technique: parsed.mitreMapping?.technique || alert.mitreTechnique,
         },
-      });
-
-      if (response.text) {
-        const parsed = JSON.parse(response.text);
-        return {
-          summary: parsed.summary,
-          blastRadius: parsed.blastRadius,
-          mitreMapping: {
-            tactic: parsed.mitreTactic || alert.mitreTactic,
-            technique: parsed.mitreTechnique || alert.mitreTechnique,
-          },
-          recommendedActions: parsed.recommendedActions || [alert.recommendedAction],
-          simulationHypothesis: parsed.simulationHypothesis || 'Simulating block shows zero false positives for legitimate users.',
-          confidenceReasoning: parsed.confidenceReasoning || `High confidence based on correlated telemetry from ${alert.sourceCountry}.`,
-        };
-      }
-    } catch (err) {
-      console.warn('Gemini API query fallback to deterministic engine:', err);
+        recommendedActions: parsed.recommendedActions || [alert.recommendedAction],
+        simulationHypothesis: parsed.simulationHypothesis || 'Simulating block shows zero false positives for legitimate users.',
+        confidenceReasoning: parsed.confidenceReasoning || `High confidence based on correlated telemetry from ${alert.sourceCountry}.`,
+      };
     }
+  } catch (err) {
+    console.warn('Backend Gemini API call fallback to deterministic engine:', err);
   }
 
   // High-fidelity instant synthesis based on alert type and context (Slide 07 & 09)

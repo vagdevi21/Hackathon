@@ -58,6 +58,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [aadhaarInput, setAadhaarInput] = useState<string>('7842 9012 3456');
   const [isOtpSent, setIsOtpSent] = useState<boolean>(false);
   const [otpCode, setOtpCode] = useState<string>('');
+  const [aadhaarGeneratedOtp, setAadhaarGeneratedOtp] = useState<string>('');
   const [otpTimer, setOtpTimer] = useState<number>(0);
   const [isAadhaarVerified, setIsAadhaarVerified] = useState<boolean>(false);
 
@@ -150,11 +151,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       return;
     }
 
+    const dynamicCode = Math.floor(100000 + Math.random() * 900000).toString();
+    setAadhaarGeneratedOtp(dynamicCode);
     setIsOtpSent(true);
     setOtpTimer(30);
     cyberAudio.playSuccess();
     setFeedback({
-      message: `OTP dispatched to phone linked with Aadhaar ending in ${rawNum.slice(-4)}. Demo OTP: 742891`,
+      message: `OTP dispatched to phone linked with Aadhaar ending in ${rawNum.slice(-4)}. Dynamic Code: ${dynamicCode}`,
       type: 'info',
     });
 
@@ -172,12 +175,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   // Verify OTP
   const handleVerifyOtp = () => {
-    if (otpCode === '742891' || otpCode.length === 6) {
+    if (otpCode === aadhaarGeneratedOtp || (aadhaarGeneratedOtp && otpCode === aadhaarGeneratedOtp.trim())) {
       setIsAadhaarVerified(true);
       cyberAudio.playSuccess();
       setFeedback({ message: 'UIDAI Aadhaar biometric signature verified successfully!', type: 'success' });
     } else {
-      setFeedback({ message: 'Invalid OTP code. Please enter 742891 to authenticate demo.', type: 'error' });
+      setFeedback({ message: 'Invalid OTP code. Please enter the dynamic 6-digit OTP dispatched above.', type: 'error' });
     }
   };
 
@@ -521,7 +524,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           Enter 6-Digit OTP sent to linked mobile:
                         </span>
                         <span className="text-[10px] font-mono text-purple-400 bg-purple-950/80 px-2 py-0.5 rounded border border-purple-800/60">
-                          Demo OTP: 742891
+                          {aadhaarGeneratedOtp ? `Dynamic OTP: ${aadhaarGeneratedOtp}` : 'Awaiting OTP...'}
                         </span>
                       </div>
 
@@ -530,7 +533,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           type="text"
                           value={otpCode}
                           onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          placeholder="742891"
+                          placeholder={aadhaarGeneratedOtp || '••••••'}
                           maxLength={6}
                           className="flex-1 px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-center text-white font-mono text-base tracking-widest outline-none focus:border-cyan-400"
                         />

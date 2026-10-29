@@ -161,13 +161,15 @@ export const saveScanHistoryItem = (
   item: Omit<ScanHistoryRecord, 'id' | 'timestamp' | 'isoDate'>,
   username?: string
 ): ScanHistoryRecord => {
-  const currentRaw = localStorage.getItem(STORAGE_KEY);
   let allRecords: ScanHistoryRecord[] = [];
-  try {
-    allRecords = currentRaw ? JSON.parse(currentRaw) : [];
-    if (!Array.isArray(allRecords)) allRecords = [];
-  } catch {
-    allRecords = [];
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    try {
+      const currentRaw = localStorage.getItem(STORAGE_KEY);
+      allRecords = currentRaw ? JSON.parse(currentRaw) : [];
+      if (!Array.isArray(allRecords)) allRecords = [];
+    } catch {
+      allRecords = [];
+    }
   }
 
   const now = new Date();
@@ -190,6 +192,26 @@ export const saveScanHistoryItem = (
       window.dispatchEvent(new CustomEvent('darkwatch_history_updated', { detail: updated }));
     } catch (e) {
       console.error('Failed to save to localStorage', e);
+    }
+
+    if (typeof fetch !== 'undefined') {
+      try {
+        const token = sessionStorage.getItem('darkwatch_auth_token') || localStorage.getItem('darkwatch_auth_token');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        fetch('/api/scans', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            target: item.query,
+            targetType: item.targetType,
+            isSaved: item.isSaved ?? true,
+            notes: item.notes,
+          }),
+        }).catch(() => {});
+      } catch {
+        // Non-blocking network sync
+      }
     }
   }
 

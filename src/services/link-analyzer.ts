@@ -522,7 +522,7 @@ export async function analyzePhoneNumber(rawInput: string): Promise<DetailedAnal
   const apiKey = (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
                  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY);
 
-  if (apiKey) {
+  if (apiKey && (!process.env || process.env.NODE_ENV !== 'test')) {
     try {
       const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI({ apiKey });
@@ -570,7 +570,7 @@ Output STRICT JSON matching this schema:
 }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',

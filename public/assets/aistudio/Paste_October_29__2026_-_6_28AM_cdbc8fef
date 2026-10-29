@@ -1,0 +1,594 @@
+# DARKWATCH AI — COMPLETE FULL-STACK UPGRADE MASTER PROMPT
+
+Act as a senior full-stack engineer, application security engineer, database architect, UI preservation specialist, and QA engineer.
+
+Your task is to inspect, upgrade, integrate, test, and document my EXISTING DARKWATCH AI application. Do not create a disconnected demo or replace the existing application with a new generic dashboard.
+
+The goal is to make the existing cybersecurity application more functional, persistent, secure, accessible, and usable while preserving its existing visual identity.
+
+## 1. ABSOLUTE RULE: PRESERVE THE EXISTING WEBSITE DESIGN
+
+Before changing code, inspect the entire source repository, including frontend components, routing, styles, assets, charts, forms, modal dialogs, service modules, APIs, environment files, package manifests, backend code, and existing tests.
+
+Preserve:
+- Existing backgrounds, gradients, colours, typography, spacing, page layouts, animations, transitions, and visual effects.
+- Existing logos, images, icons, illustrations, dashboard cards, charts, maps, network topology visualisations, navigation, and sidebar.
+- Existing page names, component structure, user workflows, and responsive behaviour.
+- All existing features that work correctly.
+
+Do not redesign the website. Do not replace the application with a template. Do not delete existing pages, components, images, stylesheets, charts, or functional code merely to simplify the implementation.
+
+Only add or improve UI elements where necessary, matching the existing visual style. Login, registration, password reset, OTP verification, error messages, and loading states must visually belong to the current design.
+
+If a feature already exists, inspect it and repair its implementation rather than creating a duplicate.
+
+## 2. INSPECT BEFORE IMPLEMENTING
+
+Create an internal implementation checklist from the complete repository and this specification.
+
+Identify:
+- All existing frontend pages and components.
+- All backend endpoints and integrations.
+- Every button, form, navigation link, modal, tab, filter, and action.
+- Existing database schemas, models, migrations, authentication mechanisms, and configuration.
+- Existing mocked data, placeholder responses, hard-coded values, fake success states, unused functions, dead code, and misleading security claims.
+- Missing error handling, missing persistence, incomplete API connections, and broken workflows.
+
+Then implement the changes in the actual source files. Do not stop after producing a plan or a list of recommendations.
+
+Do not claim that a feature is implemented simply because a button or visual component exists. Connect it to the correct service, persistent storage, validation, and error handling.
+
+## 3. USE AN ARCHITECTURE THAT WORKS IN THE TARGET ENVIRONMENT
+
+First inspect the current project's actual technology stack and retain working functionality.
+
+For the hosted Google AI Studio application:
+- Keep the existing React frontend and TypeScript where already used.
+- Use the supported Node.js server-side runtime for secure server operations.
+- Use Firebase Authentication for account credentials and Cloud Firestore for persistent application data, if Firebase is available and configured.
+- Keep all private API credentials in server-side environment variables or the platform's Secrets configuration.
+- Never expose private keys in client-side code, browser bundles, URLs, source maps, or API responses.
+
+If the imported repository already contains a Python FastAPI backend using SQLite, Pandas, scikit-learn, or Streamlit:
+- Inspect and preserve the existing implementation and its local development workflow.
+- Do not pretend that Python packages can execute inside the Node.js runtime.
+- Keep the Python backend as a separately runnable or separately deployable service where required.
+- Implement genuine service contracts between the frontend and backend.
+- Do not maintain disconnected copies of the same production data.
+- Clearly document which database is authoritative in each deployment mode.
+
+For the hosted AI Studio application, use Firestore as the persistent production data store. Do not rely on localStorage as a database or on a temporary server filesystem for important user, authentication, audit, scan, or event records.
+
+If a required provider, Firebase project, email service, or secret is missing, implement the correct integration structure and report the exact setup requirement. Do not invent credentials or claim a live integration is working when it is not configured.
+
+## 4. COMPLETE USER REGISTRATION AND LOGIN SYSTEM
+
+Implement a fully functional authentication system.
+
+### Registration
+
+Provide a registration form containing:
+- Username.
+- Email address.
+- Password.
+- Confirm password.
+- Password visibility toggle.
+- Password strength and requirement indicators.
+- Clear field-level validation errors.
+- Loading, success, failure, and duplicate-account states.
+
+Requirements:
+- Every new user must register before accessing protected application features.
+- Usernames must be unique, case-normalized consistently, and validated.
+- Email addresses must be validated and unique.
+- Password and confirmation must match.
+- Registration must fail safely if the database write or authentication-provider operation fails.
+- A partially created account must not become an unusable orphan record.
+- Send a verification OTP to the registered email address and require verification before enabling normal account access, unless a documented existing account-verification mechanism already provides equivalent protection.
+
+### Password policy
+
+Enforce the password policy on BOTH the frontend and backend:
+- Minimum length: 8 characters.
+- At least one uppercase letter.
+- At least one lowercase letter.
+- At least one digit.
+- At least one special character.
+- Reject a password that does not satisfy all requirements.
+
+Show the requirements clearly while the user types. Do not rely only on client-side validation.
+
+### Secure password storage
+
+Never store passwords as plaintext in Firestore, SQLite, localStorage, sessionStorage, browser cookies, logs, or API responses.
+
+Prefer Firebase Authentication as the credential authority. Firebase Authentication must manage the user's password securely; Firestore must store only the user's profile and application metadata.
+
+If a genuinely separate custom-authentication service is necessary, use a well-maintained password-hashing algorithm such as Argon2id or an appropriately configured bcrypt implementation. Never create a custom reversible encryption scheme for passwords.
+
+### Login
+
+Implement login with:
+- Username or email and password.
+- Backend-verified credentials.
+- Useful but non-revealing error messages.
+- Loading indicators and retry handling.
+- Protected routes and persistent authenticated sessions.
+- A working logout action.
+- Session expiry and invalid-session handling.
+- Rate limiting and protection against brute-force attempts.
+
+If username-to-email mapping is needed with Firebase Authentication, resolve it securely on the server. Do not expose the username index or account email mapping to unauthenticated users.
+
+Use secure session handling, preferably server-managed HttpOnly cookies with appropriate Secure and SameSite attributes. Apply CSRF protection where required by the selected session architecture.
+
+All protected API endpoints must verify the actual user session on the server. Hiding a button in the frontend is not authorization.
+
+Newly registered users must receive a normal user role. Never allow a user to submit their own admin role during registration.
+
+## 5. DYNAMIC OTP AND FORGOT-PASSWORD WORKFLOW
+
+This is a critical requirement. The current fixed or repeated OTP behaviour must be completely removed.
+
+### OTP generation
+
+Generate a fresh six-digit OTP using a cryptographically secure server-side random generator for every OTP request.
+
+Requirements:
+- Each new request must generate a new random OTP.
+- Do not hard-code a permanent OTP.
+- Do not use the same OTP for every user or every password reset.
+- Store only a secure hash of the OTP in persistent storage.
+- Bind each OTP to the account and purpose, such as registration verification or password recovery.
+- Set an expiry time of approximately 10 minutes.
+- Make each OTP usable only once.
+- Invalidate earlier active OTPs when a new OTP is issued.
+- Limit verification attempts, for example to five attempts.
+- Add per-account and per-IP request rate limits, resend cooldowns, and abuse protection.
+- Expired, incorrect, consumed, or superseded OTPs must be rejected.
+
+### Email delivery
+
+Integrate OTP delivery with a real email provider, such as Resend or a configured SMTP service.
+
+Use server-side secrets for all email credentials. Send OTPs to the email address associated with the account.
+
+Production behaviour:
+- Never return an OTP in the API response.
+- Never show a fixed demonstration OTP on the web interface.
+- Never write OTPs or passwords to production logs.
+- Do not claim that an email was delivered if the provider returned an error.
+
+Development behaviour:
+- If no email provider is configured, allow an explicitly marked development-only mode that logs the generated OTP to the backend terminal for local testing.
+- Never enable terminal-based OTP exposure in production.
+- Never use the development fallback to report a production email as sent.
+
+### Forgot password
+
+Implement this entire workflow:
+
+1. The user opens Forgot Password.
+2. The user enters their registered email address.
+3. The backend creates a fresh OTP for that request.
+4. The OTP is sent through the configured email service.
+5. The user enters the OTP.
+6. The backend verifies its hash, purpose, expiry, attempt count, and one-time-use status.
+7. Once verified, the user is allowed to enter a new password and confirmation.
+8. The new password must satisfy every password-policy requirement.
+9. The password credential is updated through the chosen authentication system.
+10. All outstanding reset codes for that account are invalidated.
+11. The operation is recorded in the security audit trail without recording the secret itself.
+12. The user sees a clear success message and can log in with the new password.
+
+Use a generic account-recovery response that does not reveal whether an email address is registered.
+
+After password reset, invalidate or revoke existing sessions where appropriate. Ensure that an expired OTP cannot be reused.
+
+### OTP verification UI
+
+Preserve the existing visual theme. Include:
+- Six-digit input with accessible keyboard support.
+- Paste support where practical.
+- Verify button.
+- Resend countdown.
+- Clear expired-code and incorrect-code messages.
+- Loading state and retry feedback.
+
+The resend action must actually request a new code and invalidate the old one. A countdown or animation alone is not a functioning OTP system.
+
+## 6. DATABASE DESIGN AND PERSISTENCE
+
+Implement a clean, documented, persistent database.
+
+For the hosted app, use Firestore. Add appropriate indexes, server-side validation, and Firestore security rules.
+
+Create clearly structured collections or equivalent storage entities for:
+- User profiles and role metadata.
+- Username lookup/index records.
+- OTP challenges and verification state.
+- User settings.
+- URL and phone scan history.
+- Scan bookmarks.
+- Security events and normalized telemetry.
+- Threat alerts and triage decisions.
+- Vulnerability records.
+- Patch-management jobs and their status.
+- SIEM connectors and ingestion status.
+- AI explanations and response recommendations.
+- Playbooks.
+- Response-approval requests.
+- Response execution or simulation records.
+- Audit entries.
+- Application configuration and integration status, excluding secrets.
+
+Every user-owned record must have clear ownership metadata and appropriate access checks.
+
+Use timestamps, stable identifiers, status fields, validation, pagination, and appropriate indexes.
+
+Database requirements:
+- Registration and login must survive page reloads and browser restarts, subject to session policy.
+- A saved scan must remain available after logout and subsequent login.
+- Bookmarks, scan deletions, profile updates, threat triage decisions, and audit entries must persist.
+- A failed write must not display a false success message.
+- Data operations must be scoped to the correct account.
+- Avoid deleting existing user data during schema upgrades.
+- Provide versioned, safe database migrations where the selected database requires them.
+
+Security-critical operations must not be written directly by arbitrary browser clients. Use trusted server-side code for account administration, OTP records, response approvals, audit records, and privileged database mutations.
+
+Never substitute localStorage or in-memory React state for database persistence.
+
+## 7. DASHBOARD AND SECURITY FEATURES
+
+Preserve and verify every existing DARKWATCH AI feature. Do not remove a feature because its integration is incomplete.
+
+Review and connect these modules:
+
+1. Main security dashboard.
+2. URL and phone-number scam scanner.
+3. Scan history and bookmarks.
+4. Threat triage.
+5. Global attack map.
+6. Threat heatmap.
+7. Threat trends.
+8. Threat forecasting.
+9. Network topology.
+10. Threat feed.
+11. Vulnerability management.
+12. Patch management.
+13. SIEM pipeline.
+14. AI playbooks.
+15. Governance and audit.
+16. Account settings.
+17. Registration, login, OTP, password reset, and session management.
+
+### Threat detection
+
+Implement an actual detection pipeline with:
+- Input validation.
+- Security-event normalization.
+- Rules-based detection.
+- Contextual risk scoring.
+- Severity classification.
+- Confidence indicators.
+- Impact assessment.
+- Prioritization.
+- Explainable alert-generation reasons.
+
+If an existing Python backend provides Pandas normalization, scikit-learn, or other suitable analysis tools, preserve and use those functions when the service is available.
+
+Use a real trained or configured anomaly-detection model when one is supplied. If no trained model exists, implement a clearly documented baseline detector and do not falsely claim that a production-quality ML model is running.
+
+Do not treat the mere existence of a chart, score, or AI-looking label as evidence of a working detector.
+
+### URL scanner and reputation
+
+Implement:
+- URL syntax validation and safe normalization.
+- Local rules-based risk indicators.
+- Clear risk reasons.
+- Suspicious-domain or blacklist checks where available.
+- Optional provider-backed reputation lookups through supported services.
+- Server-side secret handling for external reputation APIs.
+- Proper timeout, provider error, unavailable-provider, and rate-limit behaviour.
+- Scan history persistence.
+
+If an external provider is not configured, explicitly label the result as a local heuristic or provider-unavailable result. Never claim that an external reputation database was checked when it was not.
+
+Obtain appropriate user consent before sending a submitted URL to an external reputation service. Do not automatically visit suspicious URLs or execute their content in the user's browser.
+
+### Phone-number scanner
+
+Perform proper phone-number parsing and clearly explain which checks were actually carried out.
+
+If no telecom reputation provider is connected, label the score as a heuristic assessment. Do not falsely claim live carrier verification, real-time scam database validation, or verified STIR/SHAKEN checks without a genuine provider integration.
+
+### SIEM and event ingestion
+
+Implement a working generic event-ingestion API with:
+- Authentication or a configured shared secret for machine-to-machine requests.
+- Request validation and size limits.
+- Event normalization.
+- Safe batch ingestion.
+- Duplicate-event handling where appropriate.
+- Persistent event records.
+- Detection pipeline execution.
+- Alert creation.
+- Integration health and error reporting.
+
+Provide documented sample requests and sample payloads.
+
+Clearly distinguish synthetic test events from real connected SIEM telemetry. Real vendor-specific connectors must be configured and tested before being labelled connected.
+
+### AI explanation and recommendations
+
+When AI explanations are enabled:
+- Call the configured model through the secure server-side integration.
+- Validate and constrain output.
+- Explain why an alert was generated.
+- Distinguish evidence from inference.
+- Provide a fallback explanation when the AI provider is unavailable.
+- Never fabricate an AI analysis or external API result.
+- Protect user data and credentials from being sent to the model unnecessarily.
+
+### Risk scoring and forecasting
+
+Use a documented, consistent scoring method that considers relevant severity, confidence, impact, and available context.
+
+Make the calculations reproducible and testable. Ensure that adding an external reputation result does not accidentally double-count the same signal.
+
+Clearly label forecasts and uncertainty. Do not present synthetic percentages as measured live-network statistics.
+
+### Human-controlled response
+
+Implement:
+- Response recommendations.
+- Analyst approval requirements for critical actions.
+- Role-based approval authorization enforced by the server.
+- Durable approval and decision history.
+- Simulation-only response execution by default.
+- Explicit simulation labels and outcome records.
+
+Do not claim that a live host was isolated, a firewall rule was applied, or software was actually patched unless an authorized integration performed and verified that action.
+
+Never allow a frontend-only button to bypass the approval policy.
+
+### Vulnerability and patch management
+
+Implement persistent vulnerability records, severity and status fields, remediation recommendations, patch-job state transitions, audit records, and filtering.
+
+In prototype mode, patch deployment must remain a labelled simulation. A progress bar changing is not proof of a real system patch.
+
+### Audit trail and integrity
+
+Implement a persistent, server-controlled, append-oriented, tamper-evident audit trail.
+
+Where supported, use a SHA-256 hash chain:
+- Each audit entry references the preceding entry's hash.
+- Hash the documented, canonical representation of the entry and previous hash.
+- Use a real SHA-256 implementation.
+- Provide chain-integrity verification.
+- Make verification failures visible.
+- Do not permit normal client-side editing or arbitrary deletion of audit entries.
+
+Do not use a custom 32-bit hash or ordinary checksum and label it SHA-256.
+
+Do not call the log truly immutable unless suitable external retention or write-protection controls are actually implemented.
+
+Do not put plaintext passwords, OTPs, session cookies, API keys, or other secrets in audit records.
+
+## 8. ACCESS CONTROL AND APPLICATION SECURITY
+
+Implement server-side authorization for:
+- Authenticated users.
+- Analysts.
+- Administrators.
+- Privileged response approvers.
+
+Use the minimum permissions needed for each role.
+
+Requirements:
+- New registrations must not grant administrator privileges.
+- The client must never be trusted to choose its own role.
+- Admin-only endpoints must reject ordinary users.
+- All private data must be scoped to the authenticated account and appropriate organisation or project.
+- Apply login and OTP rate limits.
+- Validate input on both client and server.
+- Add secure error handling without exposing stack traces, secrets, database paths, or provider credentials.
+- Use secure session and cookie settings.
+- Protect against common injection, cross-site scripting, CSRF, insecure direct object reference, and authorization errors appropriate to the architecture.
+- Store API secrets only in the platform's secret manager or server environment.
+- Ensure that browser bundles and public source maps do not contain secrets.
+- Use safe logging and redaction.
+- Provide an orderly logout and session-expiration workflow.
+
+Apply default-deny database rules and verify all permissions. A hidden UI element does not count as an access-control rule.
+
+## 9. UI USABILITY AND ACCESSIBILITY
+
+Preserve the design while improving functionality.
+
+Ensure:
+- Every visible button has a real action.
+- Every form validates its inputs and displays useful feedback.
+- Loading and disabled states are handled correctly.
+- Empty states and provider-unavailable states are understandable.
+- Errors can be retried safely.
+- Modal dialogs can be opened and closed correctly.
+- Navigation destinations work.
+- Dashboard filters, search, sorting, pagination, date controls, and refresh actions work when displayed.
+- Charts use real stored data or clearly labelled synthetic data.
+- Layout remains responsive.
+- Inputs have accessible labels and keyboard support.
+- Authentication forms explain password requirements and OTP expiry.
+- Colour, contrast, focus, and error states remain consistent with the existing theme.
+
+Do not simulate successful authentication, database writes, external API checks, or security actions merely to make the UI look functional.
+
+## 10. CONFIGURATION AND INTEGRATIONS
+
+Create or update a safe example environment file and documentation.
+
+Document the required configuration for:
+- Firebase client initialization.
+- Firebase Admin/server-side access.
+- Firestore database.
+- Firebase Authentication.
+- Server-side email provider credentials.
+- Email sender identity.
+- Session and cookie configuration.
+- Optional URL reputation providers.
+- SIEM webhook authentication.
+- Optional Python service URL.
+- Development versus production behaviour.
+
+Use placeholders in example files. Do not commit real credentials.
+
+If the email provider is not configured, explain how to configure it and keep OTP development fallback strictly limited to local development.
+
+Do not expose secrets in frontend environment variables, URLs, browser responses, or Git history.
+
+## 11. TESTS THAT MUST ACTUALLY RUN
+
+Create or update automated unit, integration, and end-to-end tests wherever supported by the repository.
+
+Authentication tests:
+- Valid registration.
+- Duplicate username.
+- Duplicate email.
+- Invalid email.
+- Password shorter than eight characters.
+- Password without uppercase.
+- Password without lowercase.
+- Password without a digit.
+- Password without a special character.
+- Password confirmation mismatch.
+- Successful login.
+- Incorrect password.
+- Unknown username or email.
+- Unverified account access.
+- Logout and expired session.
+- Protected route and role restrictions.
+
+OTP tests:
+- Every new request produces a new unpredictable OTP.
+- A resend invalidates the previous OTP.
+- A valid OTP works only for the intended account and purpose.
+- Expired OTP rejection.
+- Incorrect OTP rejection.
+- Maximum attempt enforcement.
+- Rate limiting.
+- Single-use enforcement.
+- OTP never appears in production API responses or application logs.
+- Successful password reset.
+- Old password rejected after reset.
+- New password works after reset.
+
+Database tests:
+- User profile persistence.
+- Username uniqueness under concurrent registration.
+- Scan history persistence after reload and login.
+- Bookmark persistence.
+- Correct account scoping.
+- Threat event and alert persistence.
+- Vulnerability and patch record persistence.
+- Audit entry persistence and hash-chain verification.
+- Database error handling.
+
+Cybersecurity-feature tests:
+- URL parsing and validation.
+- Risk scoring and explanation consistency.
+- Missing external provider behaviour.
+- Batch event ingestion.
+- Duplicate event handling.
+- Alert prioritization.
+- Role-checked response approval.
+- Safe response simulation.
+- Rejection of unauthorized patch or response actions.
+- Audit integrity verification.
+- Correct distinction between synthetic and real telemetry.
+
+UI tests:
+- Registration and login flow.
+- Forgot-password flow.
+- OTP verification and resend.
+- Form errors and success messages.
+- Navigation.
+- Scan creation and saved history.
+- Response approval workflow.
+- Responsive layout and accessibility checks where supported.
+
+Run the project's actual tests, lint checks, type checks, and production build. Fix failures caused by your implementation. Do not claim the tests pass unless the commands were successfully executed and their actual results are known.
+
+## 12. END-TO-END ACCEPTANCE CRITERIA
+
+The work is not complete merely because code files were generated.
+
+Verify the following end-to-end workflows:
+
+A. Registration:
+A new user registers with a unique username, valid email, and compliant password. The verification email is delivered through the configured provider. The OTP is verified, the account becomes usable, and the profile persists in the database.
+
+B. Login:
+The same user logs in again using the registered username or email and password. The account remains available after a page refresh and after a new browser session, subject to the configured session policy.
+
+C. Password recovery:
+The user requests a reset OTP. The backend generates and sends a fresh code. The old code becomes invalid after resending. A valid unexpired OTP enables password reset. The new password works and the old password no longer works.
+
+D. Persistence:
+The user creates a scan, bookmark, event, or triage decision. The record remains after refreshing the website and signing in again.
+
+E. Security:
+An unauthenticated user cannot access protected APIs. A regular user cannot invoke administrator-only operations. Invalid, expired, or reused OTPs fail. Passwords and OTPs never appear in plaintext storage or production logs.
+
+F. Detection and response:
+A synthetic security event is ingested through the real event API, normalized, assessed, stored, and displayed as an explicitly labelled test event. Its explanation, risk score, approval state, and audit record are consistent with the actual backend results.
+
+G. Audit:
+A new action appends a persistent audit record. The audit verification endpoint can detect an invalid chain. It must not report success after a detectable integrity failure.
+
+H. Visual preservation:
+The existing website remains recognisably the same application. Existing background, effects, charts, visuals, navigation, and working pages remain intact.
+
+I. Integration honesty:
+An unconfigured provider must show an unavailable or not-configured state. A local heuristic, synthetic event, simulated response, or fallback explanation must never be presented as the result of an unavailable real service.
+
+## 13. DOCUMENTATION AND COMPLETION REPORT
+
+Update the project's README and setup instructions.
+
+Document:
+- Project architecture.
+- Frontend and backend startup commands.
+- Firebase configuration.
+- Required server-side secrets.
+- Email provider setup.
+- Development-only OTP testing.
+- Database collections and access rules.
+- API routes.
+- Environment variables.
+- Optional Python backend, SQLite, Pandas, and Streamlit startup instructions if retained.
+- Deployment steps.
+- Security limitations.
+- How to run all automated tests.
+- Features requiring external provider credentials or a separately deployed service.
+
+At completion, provide an implementation report containing:
+1. Files added.
+2. Files modified.
+3. Existing visual components preserved.
+4. Features implemented and verified.
+5. Tests actually run and their results.
+6. External services that are working.
+7. External services that still require configuration.
+8. Any feature that remains incomplete or unverified.
+9. Exact commands to run the updated application.
+
+Do not invent successful test results. Do not conceal implementation gaps. If a feature cannot be completed because a service, credential, permission, or platform capability is missing, explain the precise blocker and implement as much as possible without misrepresenting the result.
+
+## FINAL INSTRUCTION
+
+Inspect the complete existing project and IMPLEMENT the upgrade, including actual server-side logic, database persistence, authentication, dynamic OTP, backend authorization, event processing, integrations, UI wiring, tests, and documentation.
+
+Preserve the current DARKWATCH AI design and all existing working features. Do not return only a plan or a sample implementation. Work through the codebase, verify the available functionality, run the supported tests and build, repair issues found, and report the exact verified outcome.

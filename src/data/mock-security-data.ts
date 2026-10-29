@@ -403,8 +403,8 @@ export const INITIAL_AUDIT_LOGS: AuditRecord[] = [
     action: 'CANARY_PATCH_DEPLOY',
     target: 'bastion-01 (CVE-2024-3094)',
     result: 'SUCCESS',
-    hash: 'dw-sha256-a9f81bc2-38',
-    prevHash: 'dw-sha256-00000000-00',
+    hash: 'dw-sha256-b2ebf2e0e8e2a1b4f1a25003224b5853b87216841ae5118f4441422d0def4793',
+    prevHash: 'dw-sha256-c170db3bf704c38523b52ffb1cc0f873b6568a653b59835e83c2ff29768b21fe',
   },
   {
     id: 'AUD-002',
@@ -414,8 +414,8 @@ export const INITIAL_AUDIT_LOGS: AuditRecord[] = [
     action: 'SIMULATE_PLAYBOOK',
     target: 'ALT-9402 (Data Exfiltration DNS)',
     result: 'SIMULATED',
-    hash: 'dw-sha256-7e33dc91-3c',
-    prevHash: 'dw-sha256-a9f81bc2-38',
+    hash: 'dw-sha256-c170db3bf704c38523b52ffb1cc0f873b6568a653b59835e83c2ff29768b21fe',
+    prevHash: 'dw-sha256-69348f3587819de1295cbe49e68e596ecb193be46241b112c69aa42943dd19a6',
   },
   {
     id: 'AUD-003',
@@ -425,8 +425,8 @@ export const INITIAL_AUDIT_LOGS: AuditRecord[] = [
     action: 'CONTAINMENT_APPROVAL',
     target: 'ALT-9404 (Cobalt Strike Quarantine)',
     result: 'SUCCESS',
-    hash: 'dw-sha256-42bb01fe-40',
-    prevHash: 'dw-sha256-7e33dc91-3c',
+    hash: 'dw-sha256-69348f3587819de1295cbe49e68e596ecb193be46241b112c69aa42943dd19a6',
+    prevHash: 'dw-sha256-1d0b4affb52401c52ad041e9cfcf8a3bca3d44247fcf2819e01a6cf416ea9a92',
   },
   {
     id: 'AUD-004',
@@ -436,8 +436,8 @@ export const INITIAL_AUDIT_LOGS: AuditRecord[] = [
     action: 'NIST_CSF_REPORT_GENERATE',
     target: 'Q3 Security Compliance Assessment',
     result: 'SUCCESS',
-    hash: 'dw-sha256-91ca47d0-3a',
-    prevHash: 'dw-sha256-42bb01fe-40',
+    hash: 'dw-sha256-1d0b4affb52401c52ad041e9cfcf8a3bca3d44247fcf2819e01a6cf416ea9a92',
+    prevHash: 'dw-sha256-0000000000000000000000000000000000000000000000000000000000000000',
   },
 ];
 

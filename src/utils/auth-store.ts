@@ -569,14 +569,17 @@ export const validatePasswordStrength = (pwd: string): { valid: boolean; message
   if (!pwd || pwd.length < 8) {
     return { valid: false, message: 'Password must be at least 8 characters long.' };
   }
-  if (!/[A-Za-z]/.test(pwd)) {
-    return { valid: false, message: 'Password must contain at least one letter.' };
+  if (!/[A-Z]/.test(pwd)) {
+    return { valid: false, message: 'Password must contain at least one uppercase letter (A-Z).' };
+  }
+  if (!/[a-z]/.test(pwd)) {
+    return { valid: false, message: 'Password must contain at least one lowercase letter (a-z).' };
   }
   if (!/\d/.test(pwd)) {
-    return { valid: false, message: 'Password must contain at least one number.' };
+    return { valid: false, message: 'Password must contain at least one digit (0-9).' };
   }
-  if (!/[-@#$!%*?&]/.test(pwd)) {
-    return { valid: false, message: 'Password must contain at least one special character (e.g. -, @, #, $).' };
+  if (!/[-@#$%^&*!_~?+=|<>]/.test(pwd)) {
+    return { valid: false, message: 'Password must contain at least one special character (e.g. @, #, $, !).' };
   }
   return { valid: true, message: '' };
 };
@@ -605,3 +608,198 @@ export const resetUserPasswordWithOtp = (
     message: `Password reset successfully for ${clean}. You can now log in with your new password.`,
   };
 };
+
+// ============================================================================
+// SERVER-BACKED ASYNC API CLIENT FOR REAL INTEGRATION
+// ============================================================================
+
+const TOKEN_KEY = 'darkwatch_session_token';
+
+export const getStoredToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
+};
+
+export const setStoredToken = (token: string | null): void => {
+  if (typeof window === 'undefined') return;
+  if (token) {
+    sessionStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+  }
+};
+
+export async function apiRegisterAccount(data: {
+  username: string;
+  email: string;
+  displayName: string;
+  password: string;
+  confirmPassword: string;
+}): Promise<{ success: boolean; message: string; requiresVerification?: boolean; devHint?: string }> {
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      return { success: false, message: result.error || 'Registration failed.' };
+    }
+    return {
+      success: true,
+      message: result.message,
+      requiresVerification: result.requiresVerification,
+      devHint: result.devHint,
+    };
+  } catch (err: any) {
+    // Fallback to local client store if offline
+    const local = registerNewAccount({
+      displayName: data.displayName,
+      usernameOrPhone: data.username,
+      password: data.password,
+    });
+    return { success: local.success, message: local.message };
+  }
+}
+
+export async function apiVerifyRegistrationOtp(
+  username: string,
+  otpCode: string
+): Promise<{ success: boolean; message: string; user?: UserProfile; token?: string }> {
+  try {
+    const res = await fetch('/api/auth/verify-registration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, otpCode }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      return { success: false, message: result.error || 'Verification failed.' };
+    }
+    if (result.token) {
+      setStoredToken(result.token);
+    }
+    if (result.user) {
+      const profile: UserProfile = {
+        id: result.user.id,
+        username: result.user.username,
+        displayName: result.user.displayName,
+        accountIdentifier: result.user.email,
+        role: result.user.role,
+        authMethod: 'PASSWORD_BIOMETRIC',
+        currentLogin: result.user.currentLogin,
+        previousLogin: result.user.previousLogin,
+        isVerified: true,
+      };
+      saveUser(profile);
+      return { success: true, message: result.message, user: profile, token: result.token };
+    }
+    return { success: true, message: result.message };
+  } catch (err: any) {
+    return { success: false, message: 'Verification service unavailable.' };
+  }
+}
+
+export async function apiLogin(
+  identifier: string,
+  password: string,
+  authMethod: AuthMethod = 'PASSWORD_BIOMETRIC'
+): Promise<{ success: boolean; message: string; userProfile?: UserProfile; token?: string }> {
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, password, authMethod }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      return { success: false, message: result.error || 'Authentication failed.' };
+    }
+    if (result.token) {
+      setStoredToken(result.token);
+    }
+    if (result.user) {
+      const profile: UserProfile = {
+        id: result.user.id,
+        username: result.user.username,
+        displayName: result.user.displayName,
+        accountIdentifier: result.user.email,
+        role: result.user.role,
+        authMethod,
+        currentLogin: result.user.currentLogin,
+        previousLogin: result.user.previousLogin,
+        isVerified: result.user.isVerified,
+      };
+      saveUser(profile);
+      return { success: true, message: result.message, userProfile: profile, token: result.token };
+    }
+    return { success: false, message: 'Invalid server response' };
+  } catch (err) {
+    // Offline local fallback
+    return authenticateRegisteredUser(identifier, password, authMethod);
+  }
+}
+
+export async function apiForgotPassword(
+  identifier: string
+): Promise<{ success: boolean; message: string; devHint?: string }> {
+  try {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      return { success: false, message: result.error || 'Password recovery failed.' };
+    }
+    return { success: true, message: result.message, devHint: result.devHint };
+  } catch (err) {
+    return {
+      success: true,
+      message: 'If an account matches that identifier, a verification code has been dispatched.',
+    };
+  }
+}
+
+export async function apiResetPassword(
+  identifier: string,
+  otpCode: string,
+  newPassword: string,
+  confirmPassword: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, otpCode, newPassword, confirmPassword }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      return { success: false, message: result.error || 'Password reset failed.' };
+    }
+    return { success: true, message: result.message };
+  } catch (err) {
+    return resetUserPasswordWithOtp(identifier, otpCode, newPassword);
+  }
+}
+
+export async function apiLogout(): Promise<void> {
+  const token = getStoredToken();
+  if (token) {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+    } catch {
+      // Ignore network errors on logout
+    }
+  }
+  setStoredToken(null);
+  logoutUser();
+}
+

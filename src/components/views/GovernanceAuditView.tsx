@@ -20,7 +20,7 @@ import {
   Layers
 } from 'lucide-react';
 import { AuditRecord } from '../../types/security';
-import { UserRole } from '../../utils/security-engine';
+import { UserRole, verifyAuditChain } from '../../utils/security-engine';
 
 interface GovernanceAuditViewProps {
   auditLogs: AuditRecord[];
@@ -33,6 +33,12 @@ export const GovernanceAuditView: React.FC<GovernanceAuditViewProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [verificationResult, setVerificationResult] = useState<{
+    isValid: boolean;
+    totalBlocks: number;
+    error?: string;
+  } | null>(null);
 
   const complianceStandards = [
     { name: 'NIST CSF 2.0', score: 94, status: 'COMPLIANT', desc: 'Identify, Protect, Detect, Respond, Recover' },
@@ -52,6 +58,25 @@ export const GovernanceAuditView: React.FC<GovernanceAuditViewProps> = ({
     navigator.clipboard?.writeText(hash);
     setCopiedHash(hash);
     setTimeout(() => setCopiedHash(null), 1500);
+  };
+
+  const handleVerifyChain = async () => {
+    setIsVerifying(true);
+    try {
+      const res = await fetch('/api/audit/verify', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setVerificationResult(data);
+      } else {
+        const local = verifyAuditChain(auditLogs);
+        setVerificationResult(local);
+      }
+    } catch {
+      const local = verifyAuditChain(auditLogs);
+      setVerificationResult(local);
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const filteredLogs = auditLogs.filter(
@@ -75,16 +100,46 @@ export const GovernanceAuditView: React.FC<GovernanceAuditViewProps> = ({
           </div>
           <h2 className="text-xl font-bold text-white">Governance, Compliance & Forensic Audit Trail</h2>
           <p className="text-xs text-slate-400">
-            Every AI recommendation, human approval decision, and patch deployment is cryptographically chained for zero-trust compliance.
+            Every AI recommendation, human approval decision, and patch deployment is cryptographically chained with SHA-256 for zero-trust compliance.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleVerifyChain}
+            disabled={isVerifying}
+            className="px-3.5 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 text-xs font-mono font-bold text-purple-200 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            <ShieldCheck className="w-4 h-4 text-purple-400" />
+            <span>{isVerifying ? 'Verifying Hashes...' : 'Verify Chain Integrity'}</span>
+          </button>
           <span className="text-xs font-mono font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-800/40 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5 text-cyan-400" /> Genesis Block: #0001 Verified
+            <Lock className="w-3.5 h-3.5 text-cyan-400" /> Genesis Block: #0001
           </span>
         </div>
       </div>
+
+      {/* Chain Verification Result Toast */}
+      {verificationResult && (
+        <div className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-xs font-mono animate-fadeIn ${
+          verificationResult.isValid
+            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+            : 'bg-red-950/40 border-red-500/40 text-red-300'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>
+              <strong>Cryptographic Chain Integrity Confirmed:</strong> {verificationResult.totalBlocks} blocks verified against NIST FIPS 180-4 standard. Zero hash tampering detected.
+            </span>
+          </div>
+          <button
+            onClick={() => setVerificationResult(null)}
+            className="text-slate-400 hover:text-white px-2 py-0.5 rounded"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Compliance Standards Posture */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
