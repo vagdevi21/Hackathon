@@ -1213,11 +1213,12 @@ app.post('/api/verification/phone', rateLimiter(30, 60000), async (req: Request,
   }
 });
 
-// 2. Website / URL Verification
+// 2. Website / Destination URL Verification
 app.post('/api/verification/url', rateLimiter(30, 60000), async (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/json');
   try {
-    const { url } = req.body;
-    if (!url || typeof url !== 'string') {
+    const { url } = req.body || {};
+    if (!url || typeof url !== 'string' || !url.trim()) {
       return res.status(400).json({ error: 'Valid url string is required.' });
     }
     const result = await verifyUrl(url);

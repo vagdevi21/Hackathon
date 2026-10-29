@@ -91,6 +91,37 @@ export const AuthenticityVerificationView: React.FC<AuthenticityVerificationView
       .catch(() => {});
   }, []);
 
+  // Safe JSON & Response parser preventing "Unexpected token" errors on HTML/502/404 responses
+  const parseSafeResponse = async (res: Response): Promise<any> => {
+    const contentType = res.headers.get('content-type') || '';
+    let text = '';
+    try {
+      text = await res.text();
+    } catch {
+      text = '';
+    }
+
+    if (contentType.includes('application/json')) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(`Verification service returned an invalid JSON payload (HTTP ${res.status}).`);
+      }
+    }
+
+    // Upstream or proxy returned HTML error page (e.g., 502, 504, 404 "The page cannot be found...")
+    let cleanMsg = `Verification service returned an unexpected response format (HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}).`;
+    if (text) {
+      const titleMatch = text.match(/<title>([^<]+)<\/title>/i);
+      if (titleMatch && titleMatch[1]) {
+        cleanMsg = `Verification service: ${titleMatch[1].trim()} (HTTP ${res.status})`;
+      } else if (text.length <= 140 && !text.includes('<')) {
+        cleanMsg = `Verification service: ${text.trim()} (HTTP ${res.status})`;
+      }
+    }
+    throw new Error(cleanMsg);
+  };
+
   // 1. Phone Verification Handler
   const handleVerifyPhone = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -110,9 +141,9 @@ export const AuthenticityVerificationView: React.FC<AuthenticityVerificationView
         }),
       });
 
-      const data = await res.json();
+      const data = await parseSafeResponse(res);
       if (!res.ok) {
-        setPhoneError(data.error || 'Failed to verify phone number');
+        setPhoneError(data?.error || `Failed to verify phone number (HTTP ${res.status})`);
         cyberAudio.playCriticalAlert();
       } else {
         setPhoneResult(data);
@@ -123,7 +154,11 @@ export const AuthenticityVerificationView: React.FC<AuthenticityVerificationView
         }
       }
     } catch (err: any) {
-      setPhoneError(err.message || 'Verification network service unavailable.');
+      let msg = err?.message || 'Verification network service unavailable.';
+      if (msg.includes('Unexpected token') || msg.includes('is not valid JSON')) {
+        msg = 'Verification service returned a non-JSON response. Please check service connectivity.';
+      }
+      setPhoneError(msg);
       cyberAudio.playCriticalAlert();
     } finally {
       setIsPhoneVerifying(false);
@@ -146,9 +181,9 @@ export const AuthenticityVerificationView: React.FC<AuthenticityVerificationView
         body: JSON.stringify({ url: urlInput.trim() }),
       });
 
-      const data = await res.json();
+      const data = await parseSafeResponse(res);
       if (!res.ok) {
-        setUrlError(data.error || 'Failed to verify URL');
+        setUrlError(data?.error || `Failed to verify URL (HTTP ${res.status})`);
         cyberAudio.playCriticalAlert();
       } else {
         setUrlResult(data);
@@ -159,7 +194,11 @@ export const AuthenticityVerificationView: React.FC<AuthenticityVerificationView
         }
       }
     } catch (err: any) {
-      setUrlError(err.message || 'Verification network service unavailable.');
+      let msg = err?.message || 'Verification network service unavailable.';
+      if (msg.includes('Unexpected token') || msg.includes('is not valid JSON')) {
+        msg = 'Verification service returned a non-JSON response. Please check service connectivity.';
+      }
+      setUrlError(msg);
       cyberAudio.playCriticalAlert();
     } finally {
       setIsUrlVerifying(false);
@@ -214,9 +253,9 @@ export const AuthenticityVerificationView: React.FC<AuthenticityVerificationView
             }),
           });
 
-          const data = await res.json();
+          const data = await parseSafeResponse(res);
           if (!res.ok) {
-            setDocError(data.error || 'Document verification failed.');
+            setDocError(data?.error || `Document verification failed (HTTP ${res.status}).`);
             cyberAudio.playCriticalAlert();
           } else {
             setDocResult(data);
@@ -227,7 +266,11 @@ export const AuthenticityVerificationView: React.FC<AuthenticityVerificationView
             }
           }
         } catch (inner: any) {
-          setDocError(inner.message || 'Network error processing document.');
+          let msg = inner?.message || 'Network error processing document.';
+          if (msg.includes('Unexpected token') || msg.includes('is not valid JSON')) {
+            msg = 'Verification service returned a non-JSON response. Please check service connectivity.';
+          }
+          setDocError(msg);
           cyberAudio.playCriticalAlert();
         } finally {
           setIsDocVerifying(false);

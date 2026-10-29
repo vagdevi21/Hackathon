@@ -11,8 +11,8 @@
       "role": "SECOPS_ADMIN",
       "isVerified": true,
       "registeredAt": "2026-10-28T17:18:40.212Z",
-      "currentLogin": "2026-10-29T01:24:21.000Z",
-      "previousLogin": "2026-10-28T17:18:40.212Z",
+      "currentLogin": "2026-10-29T05:55:04.497Z",
+      "previousLogin": "2026-10-29T01:24:21.000Z",
       "failedAttempts": 0,
       "lockoutUntil": null,
       "authMethod": "PASSWORD_BIOMETRIC"
@@ -617,6 +617,39 @@
       "isVerified": true,
       "registeredAt": "2026-10-29T02:18:02.268Z",
       "currentLogin": "2026-10-29T02:18:02.268Z",
+      "previousLogin": null,
+      "failedAttempts": 0,
+      "lockoutUntil": null,
+      "authMethod": "PASSWORD_BIOMETRIC"
+    },
+    "mobile_only_analyst_1793253241751": {
+      "id": "USR-1793253241832",
+      "username": "mobile_only_analyst_1793253241751",
+      "displayName": "Mobile-Only SOC Lead",
+      "phoneNumber": "+919871390059",
+      "passwordHash": "3371f166790a89e4f6ac493526e534fab0ae04c31d0720b7b6e6040683c487f069e0801481eb5a77d6c4e6ab81f4447de3bb88e4e4aeda9a30c82a70cc3b37dc",
+      "salt": "d3af142a38a71be42effba9ed167b8f1",
+      "role": "TIER_1_ANALYST",
+      "isVerified": true,
+      "registeredAt": "2026-10-29T05:54:01.832Z",
+      "currentLogin": "2026-10-29T05:54:01.832Z",
+      "previousLogin": null,
+      "failedAttempts": 0,
+      "lockoutUntil": null,
+      "authMethod": "PASSWORD_BIOMETRIC",
+      "mobileVerifiedAt": "2026-10-29T05:54:01.832Z"
+    },
+    "analyst.persist_1793253243297": {
+      "id": "USR-1793253243364",
+      "username": "analyst.persist_1793253243297",
+      "email": "analyst.persist_1793253243297@darkwatch.corp",
+      "displayName": "Test Analyst",
+      "passwordHash": "93206a49f3cc6597bd3d3790edacfe12704bde7acc6df840e715f52691a8edd6e4df2b1f0ab5a82fa66a4f0b6223b7aa694d5ee9784207736aaa70b7447df552",
+      "salt": "84bf6065e02fafc203fed140f065109e",
+      "role": "TIER_1_ANALYST",
+      "isVerified": true,
+      "registeredAt": "2026-10-29T05:54:03.364Z",
+      "currentLogin": "2026-10-29T05:54:03.364Z",
       "previousLogin": null,
       "failedAttempts": 0,
       "lockoutUntil": null,
@@ -2056,7 +2089,7 @@
       "purpose": "REGISTRATION",
       "expiresAt": 1793240580546,
       "attempts": 0,
-      "isUsed": false,
+      "isUsed": true,
       "createdAt": 1793240280546,
       "channel": "SMS"
     },
@@ -2143,6 +2176,102 @@
       "isUsed": true,
       "createdAt": 1793240282193,
       "channel": "EMAIL"
+    },
+    {
+      "id": "OTP-9987",
+      "identifier": "+919812345678",
+      "otpHash": "6b2c03b2aa16bae30dc5e146951453d31d740d8f18a1578f041d39502f395686",
+      "salt": "32781c966168ee63cb659a2a034e8621",
+      "purpose": "REGISTRATION",
+      "expiresAt": 1793253541567,
+      "attempts": 0,
+      "isUsed": false,
+      "createdAt": 1793253241567,
+      "channel": "SMS"
+    },
+    {
+      "id": "OTP-2776",
+      "identifier": "+919822334455",
+      "otpHash": "33d9222bccbf82a8ef10f4fec1bcd3ca24411c5e8422f7e20a1b0b065af5c1a4",
+      "salt": "8bfb489ec570f2cb7ca8415202cc4224",
+      "purpose": "REGISTRATION",
+      "expiresAt": 1793253541574,
+      "attempts": 1,
+      "isUsed": true,
+      "createdAt": 1793253241574,
+      "channel": "SMS"
+    },
+    {
+      "id": "OTP-1644",
+      "identifier": "+919833445566",
+      "otpHash": "3c7bdf3657c492281e5093eb5a9564b52f9250178729118612764d420ba3de52",
+      "salt": "8f6188f8247e0d6f9fcbeac66242ae82",
+      "purpose": "REGISTRATION",
+      "expiresAt": 1793253541581,
+      "attempts": 5,
+      "isUsed": true,
+      "createdAt": 1793253241581,
+      "channel": "SMS"
+    },
+    {
+      "id": "OTP-7309",
+      "identifier": "test_otp_user_1793253243254",
+      "otpHash": "e99e874631229639f17ffa4608a9881dc868387ddf161544c897aa5ebb85e42a",
+      "salt": "8143d49663dab2b9a14512caea43d223",
+      "purpose": "REGISTRATION",
+      "expiresAt": 1793253843257,
+      "attempts": 0,
+      "isUsed": true,
+      "createdAt": 1793253243257,
+      "channel": "EMAIL"
+    },
+    {
+      "id": "OTP-5750",
+      "identifier": "test_otp_user_1793253243254",
+      "otpHash": "ea1bfa6ddfdcff06ced0134fee8031f1fdf3121350fa5071c362a86ccdee66a0",
+      "salt": "30b45abd89fd968f347e9ad2be4bd147",
+      "purpose": "REGISTRATION",
+      "expiresAt": 1793253843260,
+      "attempts": 2,
+      "isUsed": true,
+      "createdAt": 1793253243260,
+      "channel": "EMAIL"
+    },
+    {
+      "id": "OTP-6027",
+      "identifier": "test_single_use_1793253243267",
+      "otpHash": "369fc31dddcf6c5d55ff04eabbdf6b2eddd82e55a955413c5f59f57768640e89",
+      "salt": "2773f46e796da138eebcb412b3ff52eb",
+      "purpose": "PASSWORD_RESET",
+      "expiresAt": 1793253843269,
+      "attempts": 1,
+      "isUsed": true,
+      "createdAt": 1793253243269,
+      "channel": "EMAIL"
+    },
+    {
+      "id": "OTP-2133",
+      "identifier": "test_bruteforce_1793253243273",
+      "otpHash": "e15b0b5a47e2b233c6abca5ef10d66487e7a2ffd5c2413eac91a177db218ad2f",
+      "salt": "b17455fa13b0d6a033ccfff3ab01e96e",
+      "purpose": "REGISTRATION",
+      "expiresAt": 1793253843275,
+      "attempts": 5,
+      "isUsed": true,
+      "createdAt": 1793253243275,
+      "channel": "EMAIL"
+    },
+    {
+      "id": "OTP-3590",
+      "identifier": "test_purpose_1793253243290",
+      "otpHash": "b0c75d9f950bf43df568c32ab27d3fe45ba1c7b1d3c9567ea67c77c76497fe69",
+      "salt": "6bc0b5c679f0fb05e6f4dacdd28b9637",
+      "purpose": "REGISTRATION",
+      "expiresAt": 1793253843292,
+      "attempts": 1,
+      "isUsed": true,
+      "createdAt": 1793253243292,
+      "channel": "EMAIL"
     }
   ],
   "sessions": {
@@ -2185,6 +2314,14 @@
       "role": "TIER_1_ANALYST",
       "expiresAt": 1793845014871,
       "createdAt": 1793240214871
+    },
+    "aea12b05929102fc4c802ff729d5007e0f73734bf9e1e321b6bf338f44a07203": {
+      "token": "aea12b05929102fc4c802ff729d5007e0f73734bf9e1e321b6bf338f44a07203",
+      "userId": "USR-4726",
+      "username": "admin",
+      "role": "SECOPS_ADMIN",
+      "expiresAt": 1793858104498,
+      "createdAt": 1793253304498
     }
   },
   "scans": [],
@@ -2523,6 +2660,17 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "AUD-465",
+      "timestamp": "2026-10-29 05:55:04 UTC",
+      "actor": "admin@darkwatch.corp",
+      "role": "SECOPS_ADMIN",
+      "action": "USER_LOGIN_SUCCESS",
+      "target": "PASSWORD_BIOMETRIC Auth",
+      "result": "SUCCESS",
+      "hash": "dw-sha256-3a8f5fb6893c5a43528347abfd466ebcb39315ab9d3c816e38711d58e19fdcd9",
+      "prevHash": "dw-sha256-010f973aeec82b865c81eea0d6846fa5568e530c78b6e4d1091c7ae6a1400359"
+    },
     {
       "id": "AUD-992",
       "timestamp": "2026-10-29 02:16:54 UTC",

@@ -266,3 +266,70 @@ test('Scenario 13: Readable human error messages without [object Object]', async
   assert.equal(typeof docRes.explanation, 'string');
   assert.doesNotMatch(docRes.explanation, /\[object Object\]/);
 });
+
+// ============================================================================
+// BUG FIX CRITERIA TESTS: URL RISK DETECTION & ROBUST JSON HANDLING
+// ============================================================================
+
+test('Criteria 1: Legitimate URL and URL with query parameters verified with clean classification and low risk score', async () => {
+  // Test google.com
+  const googleRes = await verifyUrl('https://google.com');
+  assert.equal(googleRes.isValidSyntax, true);
+  assert.equal(googleRes.sharedClassification, 'AUTHENTICITY_VERIFIED');
+  assert.ok(googleRes.riskScore !== null && googleRes.riskScore <= 10);
+  assert.match(googleRes.explanation, /authoritative domain verified/i);
+
+  // Test github.com with deep query parameters
+  const githubRes = await verifyUrl('https://github.com/search?q=cybersecurity&type=repositories&sort=stars');
+  assert.equal(githubRes.isValidSyntax, true);
+  assert.equal(githubRes.sharedClassification, 'AUTHENTICITY_VERIFIED');
+  assert.ok(githubRes.riskScore !== null && githubRes.riskScore <= 10);
+  assert.equal(githubRes.hostname, 'github.com');
+  assert.ok(githubRes.evidence.some((e) => e.status === 'PASSED'));
+});
+
+test('Criteria 2: Suspicious lookalike URL flagged with calculated evidence-based risk score', async () => {
+  const lookalikeRes = await verifyUrl('https://paypal-security-login.xyz');
+  assert.equal(lookalikeRes.isValidSyntax, true);
+  assert.equal(lookalikeRes.sharedClassification, 'SUSPICIOUS');
+  assert.ok(lookalikeRes.riskScore !== null && lookalikeRes.riskScore >= 75);
+  assert.ok(lookalikeRes.punycodeOrLookalike);
+  assert.ok(lookalikeRes.suspiciousIndicators.some((i) => i.includes('Brand impersonation')));
+  assert.match(lookalikeRes.explanation, /suspicious domain architecture/i);
+});
+
+test('Criteria 3: Invalid URL input (not_a_valid_url and ftp://restricted) yields clean validation error without crashing', async () => {
+  // Underscore / dotless word
+  const invalidRes = await verifyUrl('not_a_valid_url');
+  assert.equal(invalidRes.isValidSyntax, false);
+  assert.equal(invalidRes.sharedClassification, 'SUSPICIOUS');
+  assert.match(invalidRes.explanation, /Invalid URL syntax/i);
+
+  // Disallowed scheme
+  const ftpRes = await verifyUrl('ftp://restricted');
+  assert.equal(ftpRes.isValidSyntax, false);
+  assert.equal(ftpRes.sharedClassification, 'SUSPICIOUS');
+  assert.match(ftpRes.explanation, /unsupported protocol scheme/i);
+});
+
+test('Criteria 4: Reputation provider returning HTML error ("The page cannot be found...") handled safely without SyntaxError', async () => {
+  const upstreamHtmlProvider: UrlReputationProvider = {
+    name: 'External Threat Feed with 502 HTML Gateway',
+    isConfigured: () => true,
+    lookup: async () => {
+      // Upstream gateway returned HTML error page
+      return {
+        status: 'ERROR',
+        errorDetail: 'Gateway returned HTTP 502 HTML error page: The page cannot be found.',
+      };
+    },
+  };
+
+  const res = await verifyUrl('https://somedomain-to-check.org', upstreamHtmlProvider);
+  assert.equal(res.isValidSyntax, true);
+  assert.equal(res.sharedClassification, 'CHECK_UNAVAILABLE');
+  assert.match(res.explanation, /provider error/i);
+  assert.doesNotMatch(res.explanation, /Unexpected token/);
+  assert.doesNotMatch(res.explanation, /is not valid JSON/);
+});
+
