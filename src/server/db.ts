@@ -109,8 +109,14 @@ export function hashPassword(password: string, salt?: string): { hash: string; s
 }
 
 export function verifyPassword(password: string, hash: string, salt: string): boolean {
-  const result = hashPassword(password, salt);
-  return crypto.timingSafeEqual(Buffer.from(result.hash, 'hex'), Buffer.from(hash, 'hex'));
+  if (!password || !hash || !salt) return false;
+  try {
+    const result = hashPassword(password, salt);
+    if (result.hash.length !== hash.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(result.hash, 'hex'), Buffer.from(hash, 'hex'));
+  } catch {
+    return false;
+  }
 }
 
 export function hashOtp(otp: string, salt: string): string {
@@ -136,38 +142,28 @@ class DarkWatchDb {
   }
 
   private getInitialData(): DarkWatchDatabaseSchema {
-    const defaultPassword = 'darkwatch123';
+    const defaultPassword = 'Admin@1234';
     const users: Record<string, UserRecord> = {};
-
-    const initialAccounts: Array<{ username: string; email: string; name: string; role: UserRole }> = [
-      { username: 'admin', email: 'admin@darkwatch.corp', name: 'SecOps Administrator', role: 'SECOPS_ADMIN' },
-      { username: 'vagdevi.lead', email: 'vagdevi@darkwatch.corp', name: 'Vagdevi', role: 'SECOPS_ADMIN' },
-      { username: 'vamsi.soc2', email: 'vamsi@darkwatch.corp', name: 'Vamsi', role: 'TIER_2_ANALYST' },
-      { username: 'surya.hunter', email: 'surya@darkwatch.corp', name: 'Surya', role: 'TIER_2_ANALYST' },
-      { username: 'tabasum.tier1', email: 'tabasum@darkwatch.corp', name: 'Tabasum', role: 'TIER_1_ANALYST' },
-      { username: 'harini.audit', email: 'harini@darkwatch.corp', name: 'Harini', role: 'COMPLIANCE_OFFICER' },
-    ];
-
     const now = new Date().toISOString();
-    for (const acc of initialAccounts) {
-      const { hash, salt } = hashPassword(defaultPassword);
-      users[acc.username.toLowerCase()] = {
-        id: `USR-${crypto.randomInt(1000, 9999)}`,
-        username: acc.username,
-        email: acc.email,
-        displayName: acc.name,
-        passwordHash: hash,
-        salt,
-        role: acc.role,
-        isVerified: true,
-        registeredAt: now,
-        currentLogin: now,
-        previousLogin: null,
-        failedAttempts: 0,
-        lockoutUntil: null,
-        authMethod: 'PASSWORD_BIOMETRIC',
-      };
-    }
+    const { hash, salt } = hashPassword(defaultPassword);
+
+    // Clean primary administrator account with policy-compliant password (Admin@1234)
+    users['admin'] = {
+      id: 'USR-ADMIN',
+      username: 'admin',
+      email: 'admin@darkwatch.corp',
+      displayName: 'SecOps Administrator',
+      passwordHash: hash,
+      salt,
+      role: 'SECOPS_ADMIN',
+      isVerified: true,
+      registeredAt: now,
+      currentLogin: now,
+      previousLogin: null,
+      failedAttempts: 0,
+      lockoutUntil: null,
+      authMethod: 'PASSWORD_BIOMETRIC',
+    };
 
     return {
       version: 2,
@@ -217,26 +213,67 @@ class DarkWatchDb {
 
   // --- User Operations ---
   public getUserByUsername(username: string): UserRecord | undefined {
+    if (!username) return undefined;
     return this.data.users[username.toLowerCase().trim()];
   }
 
   public getUserByEmail(email: string): UserRecord | undefined {
+    if (!email) return undefined;
     const clean = email.toLowerCase().trim();
-    return Object.values(this.data.users).find((u) => u.email && u.email.toLowerCase() === clean);
+    return Object.values(this.data.users).find((u) => u.email && u.email.toLowerCase().trim() === clean);
   }
 
   public getUserByPhoneNumber(phoneNumber: string): UserRecord | undefined {
+    if (!phoneNumber) return undefined;
     const clean = phoneNumber.replace(/[\s\-\(\)\.]/g, '').toLowerCase().trim();
     return Object.values(this.data.users).find((u) => {
       if (!u.phoneNumber) return false;
       const uPhone = u.phoneNumber.replace(/[\s\-\(\)\.]/g, '').toLowerCase().trim();
-      return uPhone === clean;
+      return uPhone === clean || (clean.length >= 10 && uPhone.endsWith(clean.slice(-10)));
     });
   }
 
   public findUser(identifier: string): UserRecord | undefined {
+    if (!identifier) return undefined;
     const clean = identifier.toLowerCase().trim();
-    return this.data.users[clean] || this.getUserByEmail(clean) || this.getUserByPhoneNumber(clean);
+    return (
+      this.getUserByUsername(clean) ||
+      this.getUserByEmail(clean) ||
+      this.getUserByPhoneNumber(clean) ||
+      Object.values(this.data.users).find(
+        (u) => u.username.toLowerCase() === clean || (u.displayName && u.displayName.toLowerCase() === clean)
+      )
+    );
+  }
+
+  public clearAllAccounts(): void {
+    const defaultPassword = 'Admin@1234';
+    const { hash, salt } = hashPassword(defaultPassword);
+    const now = new Date().toISOString();
+    this.data.users = {
+      admin: {
+        id: 'USR-ADMIN',
+        username: 'admin',
+        email: 'admin@darkwatch.corp',
+        displayName: 'SecOps Administrator',
+        passwordHash: hash,
+        salt,
+        role: 'SECOPS_ADMIN',
+        isVerified: true,
+        registeredAt: now,
+        currentLogin: now,
+        previousLogin: null,
+        failedAttempts: 0,
+        lockoutUntil: null,
+        authMethod: 'PASSWORD_BIOMETRIC',
+      },
+    };
+    this.data.sessions = {};
+    if (this.data.pendingRegistrations) {
+      this.data.pendingRegistrations = {};
+    }
+    this.data.otps = [];
+    this.save();
   }
 
   // --- Pending Registration Operations (Atomic until OTP is verified) ---

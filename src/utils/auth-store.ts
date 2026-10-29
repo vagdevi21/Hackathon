@@ -584,17 +584,13 @@ export const validatePasswordStrength = (pwd: string): { valid: boolean; message
   return { valid: true, message: '' };
 };
 
-export const resetUserPasswordWithOtp = (
+export const resetUserPasswordDirect = (
   usernameOrPhone: string,
-  otpCode: string,
   newPassword: string
 ): { success: boolean; message: string } => {
   const clean = usernameOrPhone.trim().toLowerCase();
   if (!clean) {
     return { success: false, message: 'Please enter your username, email, or mobile number.' };
-  }
-  if (!otpCode || otpCode.trim().length < 4) {
-    return { success: false, message: 'Please enter a valid verification OTP code.' };
   }
   const passwordCheck = validatePasswordStrength(newPassword);
   if (!passwordCheck.valid) {
@@ -607,6 +603,15 @@ export const resetUserPasswordWithOtp = (
     success: true,
     message: `Password reset successfully for ${clean}. You can now log in with your new password.`,
   };
+};
+
+// Backwards-compatible alias for any callers
+export const resetUserPasswordWithOtp = (
+  usernameOrPhone: string,
+  _otpCode: string,
+  newPassword: string
+): { success: boolean; message: string } => {
+  return resetUserPasswordDirect(usernameOrPhone, newPassword);
 };
 
 // ============================================================================
@@ -873,7 +878,7 @@ export async function apiVerifyLoginOtp(
 
 export async function apiForgotPassword(
   identifier: string
-): Promise<{ success: boolean; message: string; devHint?: string }> {
+): Promise<{ success: boolean; message: string; username?: string }> {
   try {
     const res = await fetch('/api/auth/forgot-password', {
       method: 'POST',
@@ -884,26 +889,30 @@ export async function apiForgotPassword(
     if (!res.ok) {
       return { success: false, message: result.error || 'Password recovery failed.' };
     }
-    return { success: true, message: result.message, devHint: result.devHint };
+    return { success: true, message: result.message, username: result.username };
   } catch (err) {
     return {
       success: true,
-      message: 'If an account matches that identifier, a verification code has been dispatched.',
+      message: 'Account verified. You can now reset your password directly.',
     };
   }
 }
 
 export async function apiResetPassword(
   identifier: string,
-  otpCode: string,
   newPassword: string,
-  confirmPassword: string
+  confirmPassword?: string,
+  _unusedOtpCode?: string
 ): Promise<{ success: boolean; message: string }> {
   try {
     const res = await fetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, otpCode, newPassword, confirmPassword }),
+      body: JSON.stringify({ 
+        identifier, 
+        newPassword, 
+        confirmPassword: confirmPassword || newPassword 
+      }),
     });
     const result = await res.json();
     if (!res.ok) {
@@ -911,7 +920,7 @@ export async function apiResetPassword(
     }
     return { success: true, message: result.message };
   } catch (err) {
-    return resetUserPasswordWithOtp(identifier, otpCode, newPassword);
+    return resetUserPasswordDirect(identifier, newPassword);
   }
 }
 

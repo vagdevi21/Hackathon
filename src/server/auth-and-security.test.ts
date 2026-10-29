@@ -318,3 +318,31 @@ test('RBAC Authorization: Enforces role boundaries on critical actions', () => {
   assert.equal(hasPermission('TIER_1_ANALYST', 'APPROVE_PLAYBOOK'), false);
   assert.equal(hasPermission('TIER_1_ANALYST', 'SIMULATE_PLAYBOOK'), true);
 });
+
+test('Direct Password Reset: Resets password directly without requiring 6-digit OTP', () => {
+  const user = db.getUserByUsername('admin');
+  assert.ok(user, 'Admin user exists');
+
+  // Direct password update without OTP challenge
+  const newPwd = 'NewSecurePassword@2026';
+  const { hash, salt } = hashPassword(newPwd);
+  db.updateUser(user.username, {
+    passwordHash: hash,
+    salt,
+    failedAttempts: 0,
+    lockoutUntil: null,
+  });
+
+  const updated = db.getUserByUsername('admin');
+  assert.ok(updated);
+  assert.equal(verifyPassword(newPwd, updated.passwordHash, updated.salt), true);
+  assert.equal(updated.failedAttempts, 0);
+
+  // Restore original password
+  const restore = hashPassword('darkwatch123');
+  db.updateUser(user.username, {
+    passwordHash: restore.hash,
+    salt: restore.salt,
+  });
+});
+

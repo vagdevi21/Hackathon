@@ -669,10 +669,11 @@ app.post('/api/auth/verify-login-otp', rateLimiter(15, 60000), (req: Request, re
   }
 });
 
-// Forgot Password - Dynamic OTP request (Supports Mobile SMS & Email)
-app.post('/api/auth/forgot-password', rateLimiter(5, 60000), async (req: Request, res: Response) => {
+// Forgot Password - Direct Password Recovery (Zero 6-Digit OTP Required)
+app.post('/api/auth/forgot-password', rateLimiter(10, 60000), async (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/json');
   try {
-    const { identifier } = req.body;
+    const { identifier } = req.body || {};
     if (!identifier || !identifier.trim()) {
       return res.status(400).json({ error: 'Please enter your registered username, mobile number, or email.' });
     }
@@ -686,66 +687,33 @@ app.post('/api/auth/forgot-password', rateLimiter(5, 60000), async (req: Request
       }
     }
 
-    // Generic safe response to prevent user enumeration
     if (!user) {
-      return res.json({
-        success: true,
-        message: 'If an account matches that identifier, a secure verification code has been dispatched.',
-      });
+      return res.status(404).json({ error: 'No registered user matches that identifier.' });
     }
 
-    let devHintMsg: string | undefined = undefined;
+    db.appendAuditLog('PASSWORD_RECOVERY_IDENTIFIED', user.email || user.phoneNumber || user.username, user.role, `Account: ${user.username} | Direct Reset`, 'SUCCESS');
 
-    if (user.phoneNumber) {
-      // Primary: Dispatch OTP via Mobile SMS
-      const { code } = db.createMobileOtp(user.phoneNumber, 'PASSWORD_RESET', 300);
-      const delivery = await smsService.sendOtp({
-        toPhoneNumber: user.phoneNumber,
-        otpCode: code,
-        purpose: 'PASSWORD_RESET',
-      });
-      devHintMsg = delivery.devHint;
-      db.appendAuditLog('PASSWORD_RESET_OTP_REQUEST', user.phoneNumber, user.role, `Account: ${user.username} | SMS`, 'SUCCESS');
-
-      return res.json({
-        success: true,
-        message: `A 6-digit recovery OTP has been dispatched via SMS to ${maskPhoneForDisplay(user.phoneNumber)}. Valid for 5 minutes.`,
-        devHint: process.env.NODE_ENV !== 'production' ? devHintMsg : undefined,
-      });
-    } else {
-      // Fallback for legacy accounts without registered mobile number
-      const { code } = db.createOtp(user.username, 'PASSWORD_RESET');
-      const targetEmail = user.email || `${user.username}@darkwatch.corp`;
-      const delivery = await sendOtpEmail({
-        toEmail: targetEmail,
-        username: user.username,
-        otpCode: code,
-        purpose: 'PASSWORD_RESET',
-      });
-      devHintMsg = delivery.message;
-      db.appendAuditLog('PASSWORD_RESET_OTP_REQUEST', targetEmail, user.role, `Account: ${user.username} | Email`, 'SUCCESS');
-
-      return res.json({
-        success: true,
-        message: `A secure verification code has been dispatched to ${targetEmail}.`,
-        devHint: process.env.NODE_ENV !== 'production' ? devHintMsg : undefined,
-      });
-    }
+    return res.json({
+      success: true,
+      message: `Account verified for ${user.displayName || user.username}. You can now reset your password directly.`,
+      username: user.username,
+    });
   } catch (err: any) {
     console.error('Forgot password error:', err);
     return res.status(500).json({ error: 'Failed to process password recovery request.' });
   }
 });
 
-// Reset Password with Verified OTP
+// Reset Password Directly (Zero 6-Digit OTP Required)
 app.post('/api/auth/reset-password', rateLimiter(10, 60000), (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/json');
   try {
-    const { identifier, otpCode, newPassword, confirmPassword } = req.body;
-    if (!identifier || !otpCode || !newPassword) {
-      return res.status(400).json({ error: 'Identifier, OTP code, and new password are required.' });
+    const { identifier, newPassword, confirmPassword } = req.body || {};
+    if (!identifier || !identifier.trim() || !newPassword) {
+      return res.status(400).json({ error: 'Username/email identifier and new password are required.' });
     }
 
-    if (newPassword !== confirmPassword) {
+    if (confirmPassword && newPassword !== confirmPassword) {
       return res.status(400).json({ error: 'New password and confirmation password do not match.' });
     }
 
@@ -754,14 +722,17 @@ app.post('/api/auth/reset-password', rateLimiter(10, 60000), (req: Request, res:
       return res.status(400).json({ error: policy.message });
     }
 
-    const user = db.findUser(identifier);
+    const cleanInput = identifier.trim();
+    let user = db.findUser(cleanInput);
     if (!user) {
-      return res.status(400).json({ error: 'Invalid password recovery request.' });
+      const norm = normalizeRegistrationPhone(cleanInput, '+91');
+      if (norm.valid && norm.e164) {
+        user = db.getUserByPhoneNumber(norm.e164);
+      }
     }
 
-    const verification = db.verifyOtp(user.username, otpCode, 'PASSWORD_RESET');
-    if (!verification.valid) {
-      return res.status(400).json({ error: verification.error });
+    if (!user) {
+      return res.status(404).json({ error: 'No registered user matches that identifier.' });
     }
 
     const { hash, salt } = hashPassword(newPassword);
@@ -1310,7 +1281,12 @@ async function startServer() {
   });
 }
 
-if (process.env.NODE_ENV !== 'test') {
+const isTestEnvironment = 
+  process.env.NODE_ENV === 'test' || 
+  process.argv.some((arg) => arg.includes('--test') || arg.includes('test')) ||
+  process.execArgv.some((arg) => arg.includes('--test'));
+
+if (!isTestEnvironment) {
   startServer();
 }
 
